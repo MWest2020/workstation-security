@@ -29,6 +29,8 @@ mkdir -p /var/lib/clamav
 chown clamav:clamav /var/lib/clamav
 
 echo "==> Signatures downloaden..."
+# Stop freshclam service if already running, otherwise it holds the log lock
+systemctl stop clamav-freshclam 2>/dev/null || true
 freshclam
 
 echo "==> Services aanzetten..."
@@ -37,8 +39,11 @@ systemctl enable --now clamav-freshclam
 
 if [[ $RKHUNTER_OK -eq 1 ]]; then
   echo "==> rkhunter initialiseren..."
+  # rkhunter uses deprecated egrep, causing non-zero exits — suppress errexit
+  set +e
   rkhunter --update
   rkhunter --propupd
+  set -e
 fi
 
 echo "==> Timers installeren..."

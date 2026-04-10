@@ -59,7 +59,7 @@ else
 fi
 
 if command -v rkhunter &>/dev/null; then
-  if [[ -f /var/lib/rkhunter/db/rkhunter.dat ]]; then
+  if [[ -r /var/lib/rkhunter/db/rkhunter.dat ]]; then
     rk_age=$(( ( $(date +%s) - $(stat -c %Y /var/lib/rkhunter/db/rkhunter.dat) ) / 86400 ))
     if [[ $rk_age -le 3 ]]; then
       echo "  $PASS rkhunter database (${rk_age} dagen oud)"
@@ -67,6 +67,8 @@ if command -v rkhunter &>/dev/null; then
       echo "  $WARN rkhunter database (${rk_age} dagen oud — voer 'sudo rkhunter --update' uit)"
       ((errors++)) || true
     fi
+  elif [[ $EUID -ne 0 ]] && [[ -d /var/lib/rkhunter ]]; then
+    echo "  $WARN rkhunter database niet leesbaar (voer uit als root voor volledige check)"
   else
     echo "  $FAIL rkhunter database niet gevonden"
     ((errors++)) || true

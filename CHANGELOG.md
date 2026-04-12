@@ -3,6 +3,7 @@
 ## 2026-04-12
 
 ### Toegevoegd
+- `ubuntu/install.sh` — installatiescript voor Ubuntu/Debian (apt)
 - `common/scan.sh` — ClamAV scan wrapper met exclude-patterns en `wall`-notificatie bij vondsten
 - `common/rkhunter-check.sh` — rkhunter wrapper met `wall`-notificatie bij waarschuwingen
 - `common/uninstall.sh` — verwijdert systemd timers, unit files en logrotate config

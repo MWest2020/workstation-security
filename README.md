@@ -1,6 +1,6 @@
 # workstation-security
 
-Install scripts voor ClamAV en rkhunter op Alma Linux en Arch Linux.
+Install scripts voor ClamAV en rkhunter op Alma Linux, Arch Linux en Ubuntu/Debian.
 
 Bedoeld als lichtgewicht compliancelaag (antiviruseis) voor developer workstations.
 
@@ -20,6 +20,13 @@ sudo bash alma/install.sh
 git clone https://github.com/conduction-it/workstation-security.git
 cd workstation-security
 sudo bash arch/install.sh
+```
+
+### Ubuntu / Debian
+```bash
+git clone https://github.com/conduction-it/workstation-security.git
+cd workstation-security
+sudo bash ubuntu/install.sh
 ```
 
 Na installatie draait alles automatisch via systemd timers. Geen verdere actie nodig.

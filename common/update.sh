@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # update.sh — ClamAV signatures + rkhunter database bijwerken
-# Probeert ook rkhunter te installeren als het nog niet aanwezig is maar nu wel beschikbaar via dnf
+# Probeert ook rkhunter te installeren als het nog niet aanwezig is maar nu wel beschikbaar via dnf/pacman
 set -euo pipefail
 
 echo "==> ClamAV signatures bijwerken..."
@@ -11,14 +11,17 @@ if command -v rkhunter &>/dev/null; then
   # Al geïnstalleerd — alleen database bijwerken
   rkhunter --update
   echo "  rkhunter database bijgewerkt."
-elif dnf install -y rkhunter &>/dev/null 2>&1; then
-  # Nieuw beschikbaar via dnf — installeren en initialiseren
-  echo "  rkhunter nieuw beschikbaar — geïnstalleerd."
+elif command -v dnf &>/dev/null && dnf install -y rkhunter &>/dev/null 2>&1; then
+  echo "  rkhunter nieuw beschikbaar via dnf — geïnstalleerd."
+  rkhunter --update
+  rkhunter --propupd
+  echo "  rkhunter geïnitialiseerd."
+elif command -v pacman &>/dev/null && pacman -S --noconfirm rkhunter &>/dev/null 2>&1; then
+  echo "  rkhunter nieuw beschikbaar via pacman — geïnstalleerd."
   rkhunter --update
   rkhunter --propupd
   echo "  rkhunter geïnitialiseerd."
 else
-  # Nog steeds niet beschikbaar (Alma 10)
   echo "  rkhunter niet beschikbaar — overgeslagen."
 fi
 

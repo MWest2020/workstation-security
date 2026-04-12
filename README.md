@@ -39,8 +39,12 @@ Alles loopt automatisch via systemd timers:
 | Timer                    | Wanneer         | Wat                             |
 |--------------------------|-----------------|----------------------------------|
 | `av-update.timer`        | Dagelijks 04:00 | Signatures + rkhunter database  |
-| `clamav-scan.timer`      | Zondag 02:00    | Volledige scan van `/home`      |
-| `rkhunter-check.timer`   | Zondag 03:00    | Rootkit check                   |
+| `clamav-scan.timer`      | Dagelijks 02:00 | Volledige scan van `/home`      |
+| `rkhunter-check.timer`   | Dagelijks 03:00 | Rootkit check                   |
+
+Bij vondsten ontvangen ingelogde gebruikers een `wall`-melding.
+
+Logs worden automatisch geroteerd via logrotate (wekelijks, 4 weken bewaard).
 
 ## Handmatige scan
 
@@ -57,3 +61,11 @@ sudo rkhunter --check --skip-keypress
 ```bash
 sudo bash common/update.sh
 ```
+
+## Verwijderen
+
+```bash
+sudo bash common/uninstall.sh
+```
+
+Dit verwijdert de systemd timers en logrotate config. ClamAV en rkhunter packages blijven staan — verwijder die handmatig als gewenst.

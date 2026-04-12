@@ -30,14 +30,14 @@ UNIT
 
 # --- Dagelijkse ClamAV scan ---
 
-cat > "$UNIT_DIR/clamav-scan.service" <<'UNIT'
+cat > "$UNIT_DIR/clamav-scan.service" <<UNIT
 [Unit]
 Description=ClamAV dagelijkse scan
 After=clamav-freshclam.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/clamscan -r /home --infected --log=/var/log/clamav/daily-scan.log
+ExecStart=/bin/bash $SCRIPT_DIR/scan.sh
 UNIT
 
 cat > "$UNIT_DIR/clamav-scan.timer" <<'UNIT'
@@ -54,13 +54,13 @@ UNIT
 
 # --- Dagelijkse rkhunter check ---
 
-cat > "$UNIT_DIR/rkhunter-check.service" <<'UNIT'
+cat > "$UNIT_DIR/rkhunter-check.service" <<UNIT
 [Unit]
 Description=rkhunter dagelijkse rootkit check
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/rkhunter --check --skip-keypress --report-warnings-only --logfile /var/log/rkhunter.log
+ExecStart=/bin/bash $SCRIPT_DIR/rkhunter-check.sh
 UNIT
 
 cat > "$UNIT_DIR/rkhunter-check.timer" <<'UNIT'
@@ -76,6 +76,10 @@ WantedBy=timers.target
 UNIT
 
 mkdir -p /var/log/clamav
+
+# --- Logrotate ---
+
+cp "$SCRIPT_DIR/logrotate.conf" /etc/logrotate.d/workstation-security
 
 systemctl daemon-reload
 systemctl enable --now av-update.timer

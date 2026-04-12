@@ -45,6 +45,7 @@ echo ""
 echo "Signatures:"
 
 if [[ -f /var/lib/clamav/main.cvd ]] || [[ -f /var/lib/clamav/main.cld ]]; then
+  # shellcheck disable=SC2012  # bekend pad, geen speciale tekens
   sig_file=$(ls -t /var/lib/clamav/main.c?d 2>/dev/null | head -1)
   sig_age=$(( ( $(date +%s) - $(stat -c %Y "$sig_file") ) / 86400 ))
   if [[ $sig_age -le 3 ]]; then

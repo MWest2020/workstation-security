@@ -27,6 +27,13 @@ sed -i 's/^Example/#Example/' /etc/freshclam.conf
 echo "==> Signatures downloaden..."
 freshclam
 
+echo "==> SELinux boolean voor /home scans..."
+# Zonder deze boolean blokkeert SELinux clamscan (antivirus_exec_t) op /home,
+# resultaat: scan eindigt met 0 dirs / 0 files / status=2 INVALIDARGUMENT.
+if command -v setsebool >/dev/null 2>&1; then
+  setsebool -P antivirus_can_scan_system 1
+fi
+
 echo "==> Services aanzetten..."
 systemctl enable --now clamd@scan
 systemctl enable --now clamav-freshclam

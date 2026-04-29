@@ -4,6 +4,11 @@ set -uo pipefail
 
 LOG="/var/log/rkhunter.log"
 
+if ! command -v rkhunter &>/dev/null; then
+  echo "rkhunter niet geïnstalleerd — overgeslagen."
+  exit 0
+fi
+
 rkhunter --check --skip-keypress --report-warnings-only --logfile "$LOG"
 rc=$?
 

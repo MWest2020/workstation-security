@@ -44,9 +44,11 @@ done
 echo ""
 echo "Signatures:"
 
-if [[ -f /var/lib/clamav/main.cvd ]] || [[ -f /var/lib/clamav/main.cld ]]; then
-  # shellcheck disable=SC2012  # bekend pad, geen speciale tekens
-  sig_file=$(ls -t /var/lib/clamav/main.c?d 2>/dev/null | head -1)
+# daily wordt vrijwel dagelijks ververst, main zelden — kies de nieuwste als
+# indicator voor "wanneer draaide freshclam voor het laatst succesvol".
+# shellcheck disable=SC2012  # bekend pad, geen speciale tekens
+sig_file=$(ls -t /var/lib/clamav/daily.c?d /var/lib/clamav/main.c?d 2>/dev/null | head -1)
+if [[ -n "$sig_file" ]]; then
   sig_age=$(( ( $(date +%s) - $(stat -c %Y "$sig_file") ) / 86400 ))
   if [[ $sig_age -le 3 ]]; then
     echo "  $PASS ClamAV signatures (${sig_age} dagen oud)"

@@ -26,6 +26,9 @@
 - `check.sh` — Services-blok bleef leeg op machines waar de ClamAV-daemon wél draaide. Oorzaak: `set -o pipefail` + `grep -q` early-exit gaf systemctl een SIGPIPE; pipefail propageerde dat als pipeline-exit 141, en `if !` interpreteerde dat als "niet aanwezig" → `continue`. Fix: `systemctl list-units`-output éénmaal capture'n, daarna per candidate `grep -qE … <<<"$units_output"` (here-string, geen pipe, geen SIGPIPE). Eén `systemctl`-call i.p.v. drie. Pre-existing bug; surfaced door de refactor-smoke-test.
 - `common/incident-token-revoke.sh` — zelfde SIGPIPE-patroon zat in `detect_linux` (`systemctl --user list-units … | awk … | grep -qi`) en `detect_macos` (`launchctl list | awk … | grep -q`). Op een gecompromitteerde machine met de actieve unit zou de pipeline op precies dezelfde manier exit 141 geven en de IOC-flag NIET zetten → silent miss van het exacte ding waar deze script voor bestaat. Beide refactored naar capture-eerst-dan-here-string. Repo-wide audit gedaan op overige `grep -q` in pipes; geen verdere instances.
 
+### Docs
+- `README.md` intro herschreven om de werkelijke scope te dekken. Oude intro ("Install scripts voor ClamAV en rkhunter ... antiviruseis") onderschatte de scope met factor 3+ nadat supply-chain cooldown, incident-token-revoke, `check.sh` en `bootstrap.sh` waren toegevoegd. Nieuwe intro: drie verdedigingslagen (AV+rootkit / supply-chain / IR), doelgroep (dev workstations, niet servers), target-distros, en de compliance-frame (ISO 27001 / SOC 2 / NEN 7510). Geen marketing, scope-helder zodat een nieuwe lezer in 30 seconden weet wat de repo doet.
+
 ## 2026-05-12
 
 ### Toegevoegd

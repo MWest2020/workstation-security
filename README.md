@@ -1,8 +1,40 @@
 # workstation-security
 
-Install scripts voor ClamAV en rkhunter op Alma Linux, Arch Linux en Ubuntu/Debian.
+Lichtgewicht baseline voor het hardenen van developer workstations. Bedoeld
+om de minimale set verdedigingen op orde te hebben die je voor een ISO 27001
+/ SOC 2 / NEN 7510 audit moet kunnen aantonen, zonder een full-blown EDR
+uit te rollen.
 
-Bedoeld als lichtgewicht compliancelaag (antiviruseis) voor developer workstations.
+## Drie verdedigingslagen
+
+1. **Antivirus + rootkit** — ClamAV (dagelijkse scan van `/home`) en rkhunter
+   (rootkit check), via systemd timers. Niet omdat developer workstations
+   hét doelwit van klassieke virussen zijn, maar omdat de meeste
+   compliance-frameworks *iets* aan AV willen zien.
+2. **Supply-chain cooldown** — 7-daagse quarantine op nieuwe npm / pnpm / bun
+   pakketversies. npm yankt malicious supply-chain versies meestal binnen
+   24-48u; de cooldown houdt ze buiten je lockfile vóór ze worden opgemerkt.
+   Aanleiding o.a. het npm supply-chain incident van 2026-05-11. User-level
+   config (`~/.npmrc`, `~/.bunfig.toml`) plus per-project / CI-templates voor
+   waar `~`-config niet leest.
+3. **Incident response — GitHub token compromise** — losse IR-tool voor het
+   CanisterSprawl-scenario: een gestolen GitHub-PAT met dead-man's switch die
+   `rm -rf ~/` triggert wanneer je 'm probeert te revoken. Detecteert,
+   ontwapent veilig (SIGKILL-first, evidence buiten `$HOME`), en wacht op
+   handmatige revoke met verify.
+
+Plus: een `check.sh` health-script met betekenisvolle exit-code (cron/CI),
+en een `bootstrap.sh` die `/etc/os-release` leest en automatisch de juiste
+OS-installer draait.
+
+## Doelgroep en scope
+
+- Developer workstations, **niet** servers — de aanname is dat de user
+  grotendeels root is op z'n eigen machine en de defaults wil kunnen
+  uitleggen aan een auditor.
+- Target distros: Alma / Rocky / RHEL / Fedora / CentOS (dnf), Arch /
+  Manjaro / EndeavourOS (pacman), Ubuntu / Debian / Mint / Pop / Raspbian
+  (apt). macOS wordt deels ondersteund — het IR-script werkt cross-platform.
 
 ## Gebruik
 

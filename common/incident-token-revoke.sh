@@ -220,8 +220,13 @@ detect_linux() {
   log INFO "scanning Linux user-persistence"
   [[ -f "$LINUX_UNIT_PATH" ]] && flag_artifact "systemd-unit" "$LINUX_UNIT_PATH"
   if command -v systemctl >/dev/null 2>&1; then
-    if systemctl --user list-units --all --no-legend 2>/dev/null \
-         | awk '{print $1}' | grep -qi 'gh-token-monitor'; then
+    # Capture eerst, dan grep tegen here-string — voorkomt dat `grep -q` early-
+    # exit'et en systemctl/awk een SIGPIPE-induced non-zero geven. In een IR-
+    # context is een silent-miss op een actieve unit veel erger dan een
+    # over-flag, dus we accepteren een potentieel match in beschrijving-velden.
+    local units_listing
+    units_listing="$(systemctl --user list-units --all --no-legend 2>/dev/null)"
+    if grep -qi 'gh-token-monitor' <<<"$units_listing"; then
       flag_artifact "systemd-active" "$LINUX_UNIT_NAME"
     fi
   fi
@@ -234,7 +239,12 @@ detect_macos() {
   log INFO "scanning macOS persistence"
   [[ -f "$MACOS_PLIST" ]] && flag_artifact "launchagent-plist" "$MACOS_PLIST"
   if command -v launchctl >/dev/null 2>&1; then
-    if launchctl list 2>/dev/null | awk '{print $3}' | grep -q "^${MACOS_LABEL}$"; then
+    # Capture eerst (zie commentaar in detect_linux voor reden). awk slaat
+    # alleen de Label-kolom uit, grep -x doet de exact-match check.
+    local launchctl_listing labels
+    launchctl_listing="$(launchctl list 2>/dev/null)"
+    labels="$(awk '{print $3}' <<<"$launchctl_listing")"
+    if grep -qx "$MACOS_LABEL" <<<"$labels"; then
       flag_artifact "launchagent-active" "$MACOS_LABEL"
     fi
   fi

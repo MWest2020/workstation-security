@@ -22,6 +22,10 @@
 - Single source of truth voor timer-/service-namen zit nu in `lib.sh`. Een nieuwe timer toevoegen vereist twee edits: de array in `lib.sh` en de bijhorende heredoc in `install-timers.sh`. De drift-smoke-test in `install-timers.sh` vangt vergeten heredocs.
 - De OS-installers zijn nu ~30 regels elk (was ~50-60), met de quirks expliciet gemarkeerd. Toevoegen van een nieuwe distro (bv. SUSE) = nieuw `<os>/install.sh` met dezelfde 30-regels-structuur.
 
+### Gefixt
+- `check.sh` — Services-blok bleef leeg op machines waar de ClamAV-daemon wél draaide. Oorzaak: `set -o pipefail` + `grep -q` early-exit gaf systemctl een SIGPIPE; pipefail propageerde dat als pipeline-exit 141, en `if !` interpreteerde dat als "niet aanwezig" → `continue`. Fix: `systemctl list-units`-output éénmaal capture'n, daarna per candidate `grep -qE … <<<"$units_output"` (here-string, geen pipe, geen SIGPIPE). Eén `systemctl`-call i.p.v. drie. Pre-existing bug; surfaced door de refactor-smoke-test.
+- `common/incident-token-revoke.sh` — zelfde SIGPIPE-patroon zat in `detect_linux` (`systemctl --user list-units … | awk … | grep -qi`) en `detect_macos` (`launchctl list | awk … | grep -q`). Op een gecompromitteerde machine met de actieve unit zou de pipeline op precies dezelfde manier exit 141 geven en de IOC-flag NIET zetten → silent miss van het exacte ding waar deze script voor bestaat. Beide refactored naar capture-eerst-dan-here-string. Repo-wide audit gedaan op overige `grep -q` in pipes; geen verdere instances.
+
 ## 2026-05-12
 
 ### Toegevoegd

@@ -19,9 +19,15 @@ echo ""
 
 echo "Services:"
 
+# Eén `systemctl list-units` call, output gecapture'd in een var. Daarna
+# matchen we per candidate via here-string — geen pipe, dus geen SIGPIPE-
+# risico op `grep -q` (die early-exit'et bij een hit en upstream een SIGPIPE
+# zou geven dat door `pipefail` als pipeline-failure binnenkomt — false skip).
+units_output="$(systemctl list-units --full --all 2>/dev/null)"
+
 # Detecteer welke ClamAV-service-naam actief is (Alma vs Arch vs Ubuntu).
 for svc in "${WS_CLAMAV_DAEMON_CANDIDATES[@]}"; do
-  if ! systemctl list-units --full --all 2>/dev/null | grep -q "^${svc}\b\|^  ${svc}"; then
+  if ! grep -qE "^${svc}\b|^  ${svc}" <<<"$units_output"; then
     continue
   fi
   status="$(systemctl is-active "$svc" 2>/dev/null || echo "inactive")"

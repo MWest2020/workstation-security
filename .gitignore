@@ -7,6 +7,9 @@
 # Secrets
 .env
 .env.*
+!*.env.example
+mail.env
+incident-token-revoke.env
 *.pem
 *.key
 *_rsa

@@ -1,9 +1,17 @@
 #!/usr/bin/env bash
-# install-timers.sh — systemd timers voor dagelijkse updates en scans
+# install-timers.sh — systemd timers voor dagelijkse updates en scans.
+# Heredocs hieronder zijn de canonieke unit-definities; namen moeten matchen
+# met WS_TIMERS / WS_SERVICES_GENERATED in common/lib.sh (smoke-test onderaan).
+# Style-afwijking: shebang via `env bash` i.p.v. `/bin/bash` — repo target
+# o.a. macOS; rest van repo gebruikt al `env bash`.
 set -euo pipefail
 
-UNIT_DIR="/etc/systemd/system"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
+readonly UNIT_DIR="/etc/systemd/system"
+
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/lib.sh"
 
 # --- Dagelijkse signature/database update ---
 
@@ -81,9 +89,18 @@ mkdir -p /var/log/clamav
 
 cp "$SCRIPT_DIR/logrotate.conf" /etc/logrotate.d/workstation-security
 
-systemctl daemon-reload
-systemctl enable --now av-update.timer
-systemctl enable --now clamav-scan.timer
-systemctl enable --now rkhunter-check.timer
+# --- Drift-smoke-test: zijn alle WS_TIMERS heredocs ook daadwerkelijk geschreven? ---
+for unit in "${WS_TIMERS[@]}" "${WS_SERVICES_GENERATED[@]}"; do
+  if [[ ! -f "$UNIT_DIR/$unit" ]]; then
+    echo "error: lib.sh noemt $unit maar het is niet door dit script geschreven —" >&2
+    echo "       drift tussen WS_TIMERS/WS_SERVICES_GENERATED en de heredocs." >&2
+    exit 2
+  fi
+done
 
-echo "  Timers geïnstalleerd: av-update.timer, clamav-scan.timer, rkhunter-check.timer"
+systemctl daemon-reload
+for timer in "${WS_TIMERS[@]}"; do
+  systemctl enable --now "$timer"
+done
+
+echo "  Timers geïnstalleerd: ${WS_TIMERS[*]}"

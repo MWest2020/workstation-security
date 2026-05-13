@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# rkhunter-check.sh — dagelijkse rkhunter check met notificatie bij waarschuwingen
+# rkhunter-check.sh — dagelijkse rkhunter check met notificatie bij waarschuwingen.
+# Style-afwijking: shebang `env bash` voor consistentie met repo. `set -e` UIT:
+# rkhunter --check retourneert non-zero bij gevonden warnings — dat is precies
+# wat we moeten DETECTEREN (en via `wall` melden), niet aborten op.
 set -uo pipefail
 
 LOG="/var/log/rkhunter.log"

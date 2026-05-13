@@ -1,0 +1,22 @@
+# Project-level .npmrc — drop this in repo root and commit it.
+#
+# Why: ~/.npmrc on developer workstations is great for local installs, but
+# CI/CD runners do NOT read it (they run as a different user with no home
+# config). Without a committed .npmrc, the 7-day cooldown is bypassed in
+# pipelines — exactly where supply-chain attacks land in production builds.
+#
+# This file is safe to commit. It contains zero secrets. Auth tokens stay
+# in ~/.npmrc on workstations and in CI env vars (NPM_TOKEN) — never here.
+#
+# Verify before commit:
+#   grep -E '(_authToken|password|secret)' .npmrc && echo "STOP — secret in .npmrc"
+
+# Refuse package versions younger than this. npm yanks malicious versions
+# within 24-48h; a 7-day window defangs the attack before it lands.
+min-release-age=7            # npm 11.10+  (days)
+minimum-release-age=10080    # pnpm 10.16+ (minutes; 7 * 24 * 60)
+
+# Optional hardening — uncomment if the project tolerates strict engines:
+# engine-strict=true         # fail install if node/npm version doesn't match package.json
+# audit-level=moderate       # fail install on moderate+ advisories
+# fund=false                 # silence funding banners in CI logs

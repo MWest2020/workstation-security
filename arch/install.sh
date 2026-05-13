@@ -1,59 +1,51 @@
 #!/usr/bin/env bash
-# install.sh — ClamAV + rkhunter voor Arch Linux (pacman)
+# install.sh — ClamAV + rkhunter voor Arch Linux (pacman).
+# Style-afwijking: shebang via `env bash` voor consistentie met repo.
 set -euo pipefail
 
-if [[ $EUID -ne 0 ]]; then
-  echo "Run als root: sudo bash arch/install.sh" >&2
-  exit 1
-fi
+# shellcheck source=/dev/null
+source "$(dirname "$0")/../common/install-base.sh"
 
-CLAMAV_OK=0
-RKHUNTER_OK=0
+require_root "arch/install.sh"
+
+clamav_ok=0
+rkhunter_ok=0
 
 echo "==> Packages installeren..."
 if pacman -Sy --noconfirm clamav; then
-  CLAMAV_OK=1
+  clamav_ok=1
 else
   echo "  FOUT: ClamAV installatie mislukt." >&2
   exit 2
 fi
 
-if pacman -S --noconfirm rkhunter 2>/dev/null; then
-  RKHUNTER_OK=1
-else
-  echo "  rkhunter niet beschikbaar via pacman — wordt overgeslagen."
-fi
-
-echo "==> ClamAV configureren..."
+# Quirk: pacman maakt /var/lib/clamav niet altijd aan met juiste eigenaar.
+echo "==> ClamAV state-dir voorbereiden..."
 mkdir -p /var/lib/clamav
 chown clamav:clamav /var/lib/clamav
 
 echo "==> Signatures downloaden..."
-# Stop freshclam service if already running, otherwise it holds the log lock
-systemctl stop clamav-freshclam 2>/dev/null || true
-freshclam
+freshclam_safe
 
 echo "==> Services aanzetten..."
-systemctl enable --now clamav-daemon
-systemctl enable --now clamav-freshclam
+enable_clamav_services clamav-daemon clamav-freshclam
 
-if [[ $RKHUNTER_OK -eq 1 ]]; then
-  echo "==> rkhunter initialiseren..."
-  # rkhunter uses deprecated egrep, causing non-zero exits — suppress errexit
+echo "==> rkhunter installeren..."
+if pacman -S --noconfirm rkhunter 2>/dev/null; then
+  # Quirk: rkhunter in Arch gebruikt deprecated egrep en geeft non-zero exit
+  # bij --update; --propupd is wel betrouwbaar. set -e tijdelijk uit om
+  # vroegtijdig exit te voorkomen.
   set +e
-  rkhunter --update
-  rkhunter --propupd
+  rkhunter_init
   set -e
+  rkhunter_ok=1
+else
+  echo "  rkhunter niet beschikbaar via pacman — wordt overgeslagen."
 fi
 
 echo "==> Timers installeren..."
-bash "$(dirname "$0")/../common/install-timers.sh"
+install_timers
 
-echo ""
-echo "=== Installatie resultaat ==="
-[[ $CLAMAV_OK -eq 1 ]]   && echo "  [OK]   ClamAV"   || echo "  [FAIL] ClamAV"
-[[ $RKHUNTER_OK -eq 1 ]] && echo "  [OK]   rkhunter" || echo "  [SKIP] rkhunter (niet beschikbaar via pacman)"
-echo ""
-echo "Voer 'sudo bash check.sh' uit voor statusoverzicht."
+print_summary "$clamav_ok" "$rkhunter_ok" "pacman"
 
 exit 0

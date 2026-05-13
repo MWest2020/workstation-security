@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# scan.sh — dagelijkse ClamAV scan met exclude-patterns en notificatie bij vondsten
+# scan.sh — dagelijkse ClamAV scan met exclude-patterns en notificatie bij vondsten.
+# Style-afwijking: shebang `env bash` voor consistentie met repo. `set -e` UIT:
+# clamscan retourneert exit 1 bij gevonden infecties — dat is precies wat we
+# moeten DETECTEREN (en via `wall` melden), niet aborten op.
 set -uo pipefail
 
 LOG="/var/log/clamav/daily-scan.log"

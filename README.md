@@ -8,24 +8,28 @@ Bedoeld als lichtgewicht compliancelaag (antiviruseis) voor developer workstatio
 
 Clone en installeer in één keer — daarna nooit meer naar omkijken.
 
-### Alma Linux
+### Aanbevolen: auto-detect OS
+
 ```bash
 git clone https://github.com/conduction-it/workstation-security.git
 cd workstation-security
+sudo bash bootstrap.sh
+```
+
+`bootstrap.sh` leest `/etc/os-release` en dispatched naar de juiste installer
+(alma/arch/ubuntu). Bij onbekend OS valt het terug op `ID_LIKE` en print
+anders een heldere foutmelding.
+
+### Of: directe per-OS installer
+
+```bash
+# Alma / Rocky / CentOS / RHEL / Fedora
 sudo bash alma/install.sh
-```
 
-### Arch Linux
-```bash
-git clone https://github.com/conduction-it/workstation-security.git
-cd workstation-security
+# Arch / Manjaro / EndeavourOS
 sudo bash arch/install.sh
-```
 
-### Ubuntu / Debian
-```bash
-git clone https://github.com/conduction-it/workstation-security.git
-cd workstation-security
+# Ubuntu / Debian / Mint / Pop / Raspbian
 sudo bash ubuntu/install.sh
 ```
 
@@ -52,6 +56,16 @@ Alles loopt automatisch via systemd timers:
 Bij vondsten ontvangen ingelogde gebruikers een `wall`-melding.
 
 Logs worden automatisch geroteerd via logrotate (wekelijks, 4 weken bewaard).
+
+## Status check
+
+```bash
+sudo bash check.sh
+```
+
+Toont services / timers / signatures / laatste scans. Exit-code is gelijk
+aan het aantal gevonden problemen (capped op 2), zodat het in cron of CI
+gebruikt kan worden als gezondheids-probe.
 
 ## Handmatige scan
 
@@ -121,6 +135,24 @@ Idempotent en user-level (geen sudo). Schrijft naar:
 Bestaande inhoud (auth tokens, registries, custom keys) en file-mode blijven
 behouden. Voor een spoedige CVE-fix die binnen het venster valt: per-project
 override via een lokale `.npmrc` / `bunfig.toml` met de waarde op `0`.
+
+### Per-project + CI
+
+`~/.npmrc` dekt alleen je eigen workstation. CI-runners draaien als een
+andere user zonder dit home-config, dus de cooldown is daar bypassed —
+precies waar supply-chain attacks in production builds landen. Drop
+daarom een **project-lokale** config in elke Node/Bun repo die je owned:
+
+```bash
+cp common/templates/project-npmrc.example         <jouw-repo>/.npmrc
+cp common/templates/project-bunfig.toml.example   <jouw-repo>/bunfig.toml
+# committen — beide files bevatten geen secrets
+```
+
+Voor projecten waar je geen file mag committen (gedeeld met teams die
+deze opinie niet delen): in plaats daarvan CI env vars zetten —
+`NPM_CONFIG_MIN_RELEASE_AGE=7` en `NPM_CONFIG_MINIMUM_RELEASE_AGE=10080`.
+Zie `common/templates/README.md` voor de volledige uitleg.
 
 ## Handmatige update
 

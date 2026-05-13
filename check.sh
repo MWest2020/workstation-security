@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
-# check.sh — controleer of ClamAV en rkhunter correct draaien
+# check.sh — controleer of ClamAV en rkhunter correct draaien.
+# Exit-code is gelijk aan het aantal gevonden problemen (capped op 2), zodat
+# cron/CI kan detecteren wanneer er iets niet klopt.
+# Style-afwijking: shebang via `env bash` voor consistentie met repo.
 set -euo pipefail
 
-PASS="✓"
-FAIL="✗"
-WARN="!"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
+
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/common/lib.sh"
+
 errors=0
 
 echo ""
@@ -13,17 +19,16 @@ echo ""
 
 echo "Services:"
 
-# Detecteer welke ClamAV service-naam actief is (Alma vs Arch)
-for svc in clamav-freshclam clamd@scan clamav-daemon; do
-  # Sla over als unit niet bestaat op dit systeem
-  if ! systemctl list-units --full --all 2>/dev/null | grep -q "^$svc\b\|^  $svc"; then
+# Detecteer welke ClamAV-service-naam actief is (Alma vs Arch vs Ubuntu).
+for svc in "${WS_CLAMAV_DAEMON_CANDIDATES[@]}"; do
+  if ! systemctl list-units --full --all 2>/dev/null | grep -q "^${svc}\b\|^  ${svc}"; then
     continue
   fi
-  status=$(systemctl is-active "$svc" 2>/dev/null || echo "inactive")
+  status="$(systemctl is-active "$svc" 2>/dev/null || echo "inactive")"
   if [[ "$status" == "active" ]]; then
-    echo "  $PASS $svc"
+    ws_ok "$svc"
   else
-    echo "  $FAIL $svc (inactive)"
+    ws_fail "$svc (inactive)"
     ((errors++)) || true
   fi
 done
@@ -31,12 +36,12 @@ done
 echo ""
 echo "Timers:"
 
-for timer in av-update.timer clamav-scan.timer rkhunter-check.timer; do
-  status=$(systemctl is-active "$timer" 2>/dev/null || echo "inactive")
+for timer in "${WS_TIMERS[@]}"; do
+  status="$(systemctl is-active "$timer" 2>/dev/null || echo "inactive")"
   if [[ "$status" == "active" ]]; then
-    echo "  $PASS $timer"
+    ws_ok "$timer"
   else
-    echo "  $FAIL $timer (inactive)"
+    ws_fail "$timer (inactive)"
     ((errors++)) || true
   fi
 done
@@ -51,13 +56,13 @@ sig_file=$(ls -t /var/lib/clamav/daily.c?d /var/lib/clamav/main.c?d 2>/dev/null 
 if [[ -n "$sig_file" ]]; then
   sig_age=$(( ( $(date +%s) - $(stat -c %Y "$sig_file") ) / 86400 ))
   if [[ $sig_age -le 3 ]]; then
-    echo "  $PASS ClamAV signatures (${sig_age} dagen oud)"
+    ws_ok "ClamAV signatures (${sig_age} dagen oud)"
   else
-    echo "  $WARN ClamAV signatures (${sig_age} dagen oud — voer 'sudo freshclam' uit)"
+    ws_warn "ClamAV signatures (${sig_age} dagen oud — voer 'sudo freshclam' uit)"
     ((errors++)) || true
   fi
 else
-  echo "  $FAIL ClamAV signatures niet gevonden"
+  ws_fail "ClamAV signatures niet gevonden"
   ((errors++)) || true
 fi
 
@@ -65,46 +70,48 @@ if command -v rkhunter &>/dev/null; then
   if [[ -r /var/lib/rkhunter/db/rkhunter.dat ]]; then
     rk_age=$(( ( $(date +%s) - $(stat -c %Y /var/lib/rkhunter/db/rkhunter.dat) ) / 86400 ))
     if [[ $rk_age -le 3 ]]; then
-      echo "  $PASS rkhunter database (${rk_age} dagen oud)"
+      ws_ok "rkhunter database (${rk_age} dagen oud)"
     else
-      echo "  $WARN rkhunter database (${rk_age} dagen oud — voer 'sudo rkhunter --update' uit)"
+      ws_warn "rkhunter database (${rk_age} dagen oud — voer 'sudo rkhunter --update' uit)"
       ((errors++)) || true
     fi
   elif [[ $EUID -ne 0 ]] && [[ -d /var/lib/rkhunter ]]; then
-    echo "  $WARN rkhunter database niet leesbaar (voer uit als root voor volledige check)"
+    ws_warn "rkhunter database niet leesbaar (voer uit als root voor volledige check)"
   else
-    echo "  $FAIL rkhunter database niet gevonden"
+    ws_fail "rkhunter database niet gevonden"
     ((errors++)) || true
   fi
 else
-  echo "  - rkhunter niet geïnstalleerd (optioneel)"
+  ws_skip "rkhunter niet geïnstalleerd (optioneel)"
 fi
 
 echo ""
 echo "Laatste scans:"
 
 if [[ -f /var/log/clamav/daily-scan.log ]]; then
-  scan_date=$(stat -c %y /var/log/clamav/daily-scan.log | cut -d' ' -f1)
-  echo "  $PASS ClamAV scan (laatst: $scan_date)"
+  scan_date="$(stat -c %y /var/log/clamav/daily-scan.log | cut -d' ' -f1)"
+  ws_ok "ClamAV scan (laatst: $scan_date)"
 else
-  echo "  $WARN ClamAV scan nog nooit gedraaid (eerste scan om 02:00)"
+  ws_warn "ClamAV scan nog nooit gedraaid (eerste scan om 02:00)"
 fi
 
 if command -v rkhunter &>/dev/null; then
   if [[ -f /var/log/rkhunter.log ]]; then
-    rk_date=$(stat -c %y /var/log/rkhunter.log | cut -d' ' -f1)
-    echo "  $PASS rkhunter check (laatst: $rk_date)"
+    rk_date="$(stat -c %y /var/log/rkhunter.log | cut -d' ' -f1)"
+    ws_ok "rkhunter check (laatst: $rk_date)"
   else
-    echo "  $WARN rkhunter check nog nooit gedraaid (eerste check om 03:00)"
+    ws_warn "rkhunter check nog nooit gedraaid (eerste check om 03:00)"
   fi
 else
-  echo "  - rkhunter niet geïnstalleerd (optioneel)"
+  ws_skip "rkhunter niet geïnstalleerd (optioneel)"
 fi
 
 echo ""
 if [[ $errors -eq 0 ]]; then
   echo "Alles in orde."
+  exit 0
 else
   echo "$errors probleem/problemen gevonden."
+  # Cap exit-code op 2 — exit-codes boven 125 hebben in shell speciale betekenis.
+  exit $(( errors > 2 ? 2 : errors ))
 fi
-echo ""

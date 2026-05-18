@@ -10,6 +10,7 @@ collega's die de tool overnemen, of jij over zes maanden.
 |---|---|---|
 | [`compliance.md`](compliance.md) | Auditor, security officer, sales-ondersteuning | Mapping van workstation-security componenten op specifieke control-IDs in ISO 27001:2022, SOC 2 (CC6/CC7), NEN 7510-2:2017 en BIO. Plus expliciete gap-lijst. |
 | [`threat-model.md`](threat-model.md) | Implementatie-engineers, security-reviewers | Wat verdedigen we WEL, wat NIET. Voorkomt scope-creep en zet verwachtingen voor wat dit script kan oplossen. |
+| [`supply-chain-cooldown.md`](supply-chain-cooldown.md) | Devs, sec-engineers, lezers die de baseline niet adopteren maar wel deze laag willen begrijpen | Aanleiding, mechanisme per package-manager (npm / pnpm / bun), workstation-vs-project-vs-CI-scope, en override-flow voor urgente CVEs. Staat-op-zichzelf. |
 
 ## Hoe deze docs te gebruiken
 

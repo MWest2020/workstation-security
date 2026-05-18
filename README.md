@@ -1,90 +1,36 @@
 # workstation-security
 
-Lichtgewicht baseline voor het hardenen van developer workstations. Bedoeld
-om de minimale set verdedigingen op orde te hebben die je voor een ISO 27001
-/ SOC 2 / NEN 7510 / BIO audit moet kunnen aantonen, zonder een full-blown
-EDR uit te rollen.
+[![smoke](https://github.com/MWest2020/workstation-security/actions/workflows/smoke.yml/badge.svg)](https://github.com/MWest2020/workstation-security/actions/workflows/smoke.yml)
+[![License: EUPL-1.2](https://img.shields.io/badge/License-EUPL_1.2-blue.svg)](LICENSE)
+[![shellcheck](https://img.shields.io/badge/shellcheck-clean-brightgreen)](.pre-commit-config.yaml)
 
-Voor mappings naar specifieke control-IDs en het bedreigingsmodel: zie
-[`docs/`](docs/) — `compliance.md` voor de framework-mapping,
-`threat-model.md` voor wat we wel/niet verdedigen.
+Lichtgewicht baseline voor het hardenen van developer workstations. Bedoeld om de minimale set verdedigingen op orde te hebben die je voor een ISO 27001 / SOC 2 / NEN 7510 / BIO audit moet kunnen aantonen, zonder een full-blown EDR uit te rollen.
 
-## Drie verdedigingslagen
-
-1. **Antivirus + rootkit** — ClamAV (dagelijkse scan van `/home`) en rkhunter
-   (rootkit check), via systemd timers. Niet omdat developer workstations
-   hét doelwit van klassieke virussen zijn, maar omdat de meeste
-   compliance-frameworks *iets* aan AV willen zien.
-2. **Supply-chain cooldown** — 7-daagse quarantine op nieuwe npm / pnpm / bun
-   pakketversies. npm yankt malicious supply-chain versies meestal binnen
-   24-48u; de cooldown houdt ze buiten je lockfile vóór ze worden opgemerkt.
-   Aanleiding o.a. het npm supply-chain incident van 2026-05-11. User-level
-   config (`~/.npmrc`, `~/.bunfig.toml`) plus per-project / CI-templates voor
-   waar `~`-config niet leest.
-3. **Incident response — GitHub token compromise** — losse IR-tool voor het
-   CanisterSprawl-scenario: een gestolen GitHub-PAT met dead-man's switch die
-   `rm -rf ~/` triggert wanneer je 'm probeert te revoken. Detecteert,
-   ontwapent veilig (SIGKILL-first, evidence buiten `$HOME`), en wacht op
-   handmatige revoke met verify.
-
-Plus: een `check.sh` health-script met betekenisvolle exit-code (cron/CI),
-en een `bootstrap.sh` die `/etc/os-release` leest en automatisch de juiste
-OS-installer draait.
+Voor mappings naar specifieke control-IDs en het bedreigingsmodel: zie [`docs/`](docs/) — `compliance.md` voor de framework-mapping, `threat-model.md` voor wat we wel/niet verdedigen, `supply-chain-cooldown.md` voor de standalone uitleg van laag 2.
 
 ## Doelgroep en scope
 
-- Developer workstations, **niet** servers — de aanname is dat de user
-  grotendeels root is op z'n eigen machine en de defaults wil kunnen
-  uitleggen aan een auditor.
-- Target distros: Alma / Rocky / RHEL / Fedora / CentOS (dnf), Arch /
-  Manjaro / EndeavourOS (pacman), Ubuntu / Debian / Mint / Pop / Raspbian
-  (apt). macOS wordt deels ondersteund — het IR-script werkt cross-platform.
-- WSL2 (Windows Subsystem for Linux) is detecteerbaar en wordt netjes
-  afgehandeld — scripts skippen systemd-features waar nodig in plaats van
-  hard te falen. Zie [WSL Support](#wsl-support) onderaan.
+- Developer workstations, **niet** servers — de aanname is dat de user grotendeels root is op z'n eigen machine en de defaults wil kunnen uitleggen aan een auditor.
+- Target distros: Alma / Rocky / RHEL / Fedora / CentOS (dnf), Arch / Manjaro / EndeavourOS (pacman), Ubuntu / Debian / Mint / Pop / Raspbian (apt). macOS wordt deels ondersteund — het IR-script werkt cross-platform.
+- WSL2 (Windows Subsystem for Linux) is detecteerbaar en wordt netjes afgehandeld — scripts skippen systemd-features waar nodig in plaats van hard te falen. Zie [WSL Support](#wsl-support) onderaan.
 
-## Gebruik
+## Drie verdedigingslagen
 
-Clone en installeer in één keer — daarna nooit meer naar omkijken.
+Elk standalone te begrijpen en in te zetten. Je kunt 1, 2 en 3 los gebruiken — `bootstrap.sh` rolt 1 uit (de andere zijn aparte invocations).
 
-### Aanbevolen: auto-detect OS
+### 1. Antivirus + rootkit
 
+**Wat:** ClamAV (dagelijkse scan van `/home`) en rkhunter (rootkit check), via systemd timers. Bij vondsten een `wall`-melding aan ingelogde users. Logs geroteerd via logrotate (wekelijks, 4 weken bewaard).
+
+**Voor wie:** elke auditor en elk compliance-framework wil *iets* aan AV zien op een workstation, ook al is het bedreigingsmodel voor klassieke virussen op dev-machines beperkt. Dit dekt die eis met minimal overhead.
+
+**Snelle start:**
 ```bash
-git clone https://github.com/conduction-it/workstation-security.git
-cd workstation-security
-sudo bash bootstrap.sh
+sudo bash bootstrap.sh             # auto-detect OS, installeert AV + timers
+sudo bash check.sh                 # exit-code = aantal problemen (cron/CI-bruikbaar)
 ```
 
-`bootstrap.sh` leest `/etc/os-release` en dispatched naar de juiste installer
-(alma/arch/ubuntu). Bij onbekend OS valt het terug op `ID_LIKE` en print
-anders een heldere foutmelding.
-
-### Of: directe per-OS installer
-
-```bash
-# Alma / Rocky / CentOS / RHEL / Fedora
-sudo bash alma/install.sh
-
-# Arch / Manjaro / EndeavourOS
-sudo bash arch/install.sh
-
-# Ubuntu / Debian / Mint / Pop / Raspbian
-sudo bash ubuntu/install.sh
-```
-
-Na installatie draait alles automatisch via systemd timers. Geen verdere actie nodig.
-
-## Wat wordt er geïnstalleerd?
-
-| Package     | Functie                          |
-|-------------|----------------------------------|
-| `clamav`    | Antivirus scanner                |
-| `clamd`     | Daemon voor realtime scanning    |
-| `rkhunter`  | Rootkit detectie                 |
-
-## Na installatie
-
-Alles loopt automatisch via systemd timers:
+Na installatie:
 
 | Timer                    | Wanneer         | Wat                             |
 |--------------------------|-----------------|----------------------------------|
@@ -92,9 +38,68 @@ Alles loopt automatisch via systemd timers:
 | `clamav-scan.timer`      | Dagelijks 02:00 | Volledige scan van `/home`      |
 | `rkhunter-check.timer`   | Dagelijks 03:00 | Rootkit check                   |
 
-Bij vondsten ontvangen ingelogde gebruikers een `wall`-melding.
+### 2. Supply-chain cooldown (npm / pnpm / bun)
 
-Logs worden automatisch geroteerd via logrotate (wekelijks, 4 weken bewaard).
+**Wat:** 7-daagse quarantine op verse pakketversies. npm yankt malicious supply-chain versies doorgaans binnen 24-48u — een cooldown houdt ze buiten je lockfile vóór ze opgemerkt worden.
+
+**Voor wie:** iedereen die `npm install` / `pnpm install` / `bun install` op een dev-machine of in CI draait. Vooral relevant als je projecten met veel transitive deps onderhoudt.
+
+**Snelle start:**
+```bash
+bash common/install-pm-cooldown.sh             # default 7 dagen
+bash common/install-pm-cooldown.sh --days 14   # andere window
+bash common/install-pm-cooldown.sh --check     # huidige state tonen
+bash common/install-pm-cooldown.sh --dry-run   # wat het zou doen, geen wijzigingen
+```
+
+User-level (`~/.npmrc` + `~/.bunfig.toml`). Voor CI / per-project / override-flow zie [`docs/supply-chain-cooldown.md`](docs/supply-chain-cooldown.md).
+
+### 3. Incident response — GitHub-token compromise
+
+**Wat:** losse IR-tool voor het CanisterSprawl-scenario (gestolen GitHub-PAT met dead-man's switch die `rm -rf ~/` triggert wanneer je 'm probeert te revoken). Detecteert, ontwapent veilig (SIGKILL-first, evidence buiten `$HOME`), en wacht op handmatige revoke met verify.
+
+**Voor wie:** als je `gh` CLI gebruikt of een GitHub PAT in je shell hebt en het scenario klinkt niet hypothetisch genoeg om te negeren. Bij twijfel: draai eerst `--dry-run` om te zien of de detectie iets vindt.
+
+**Snelle start:**
+```bash
+bash common/incident-token-revoke.sh --dry-run   # alleen detectie
+bash common/incident-token-revoke.sh             # volledige flow
+```
+
+User-level (geen root nodig). Schone runs laten niks achter op disk; alleen bij findings wordt `/tmp/incident-<ts>/` aangemaakt. Voor optionele mail-rapportage via SMTPS zie de "Optionele mail-rapportage"-sectie verderop.
+
+## Installatie
+
+Clone en installeer in één keer.
+
+```bash
+git clone https://github.com/MWest2020/workstation-security.git
+cd workstation-security
+sudo bash bootstrap.sh
+```
+
+`bootstrap.sh` leest `/etc/os-release` en dispatched naar de juiste installer (alma/arch/ubuntu). Bij onbekend OS valt het terug op `ID_LIKE` en print anders een heldere foutmelding.
+
+Direct per-OS installer kan ook:
+
+```bash
+sudo bash alma/install.sh             # Alma / Rocky / CentOS / RHEL / Fedora
+sudo bash arch/install.sh             # Arch / Manjaro / EndeavourOS
+sudo bash ubuntu/install.sh           # Ubuntu / Debian / Mint / Pop / Raspbian
+```
+
+Voor CI / audit-evidence-flows: elk van bovenstaande accepteert `--dry-run`. Geen side effects, exit 0, output copy-paste-baar.
+
+```bash
+sudo bash bootstrap.sh --dry-run      # print welke sub-installer aangeroepen zou worden
+bash ubuntu/install.sh --dry-run      # print zou-uitgevoerd-zijn pkg-manager commando's
+```
+
+`--version` werkt op alle entrypoints en respecteert geen sudo:
+
+```bash
+bash bootstrap.sh --version           # workstation-security <semver>
+```
 
 ## Status check
 
@@ -102,40 +107,19 @@ Logs worden automatisch geroteerd via logrotate (wekelijks, 4 weken bewaard).
 sudo bash check.sh
 ```
 
-Toont services / timers / signatures / laatste scans. Exit-code is gelijk
-aan het aantal gevonden problemen (capped op 2), zodat het in cron of CI
-gebruikt kan worden als gezondheids-probe.
+Toont services / timers / signatures / laatste scans. Exit-code is gelijk aan het aantal gevonden problemen (capped op 2), zodat het in cron of CI gebruikt kan worden als gezondheids-probe.
 
-## Handmatige scan
+## Handmatige scan + update
 
 ```bash
-# Volledige scan
 sudo clamscan -r /home --infected --log=/var/log/clamav/manual-scan.log
-
-# rkhunter check
 sudo rkhunter --check --skip-keypress
+sudo bash common/update.sh            # signatures + rkhunter db
 ```
 
-## Incident response — GitHub-token dead-man's switch
+## Incident response — uitgebreid
 
-Voor het CanisterSprawl-scenario (gestolen GitHub-PAT met dead-man's switch
-die `rm -rf ~/` triggert bij token-revoke):
-
-```bash
-bash common/incident-token-revoke.sh --dry-run   # alleen detectie
-bash common/incident-token-revoke.sh             # volledige flow
-```
-
-Werkt user-level (geen root nodig). Vangt eerst de huidige `gh`-token op
-(hash + last-4) voor latere verify, detecteert IOC's + heuristisch, kill't
-polling-processen met **SIGKILL voordat** systemd er een SIGTERM op stuurt
-(een TERM-trap in de payload kan namelijk alsnog `rm -rf ~/` triggeren),
-archiveert artefacten naar `/tmp/incident-<ts>/` (overleeft `rm -rf ~/`),
-maakt de token op deze machine onbruikbaar, en wacht op handmatige revoke
-op github.com/settings/tokens (er is geen user-self-revoke REST endpoint).
-
-Schone runs laten niks achter op disk; alleen bij findings wordt
-`/tmp/incident-<ts>/` aangemaakt.
+Het IR-script (`common/incident-token-revoke.sh`) vangt eerst de huidige `gh`-token op (hash + last-4) voor latere verify, detecteert IOC's + heuristisch, kill't polling-processen met **SIGKILL voordat** systemd er een SIGTERM op stuurt (een TERM-trap in de payload kan namelijk alsnog `rm -rf ~/` triggeren), archiveert artefacten naar `/tmp/incident-<ts>/` (overleeft `rm -rf ~/`), maakt de token op deze machine onbruikbaar, en wacht op handmatige revoke op github.com/settings/tokens (er is geen user-self-revoke REST endpoint).
 
 ### Optionele mail-rapportage
 
@@ -148,62 +132,11 @@ chmod 600 ~/.config/workstation-security/mail.env
 $EDITOR ~/.config/workstation-security/mail.env
 ```
 
-Het script weigert te mailen als die file niet op mode 600/400 staat
-(bevat een App Password).
-
-## Package-manager cooldown (npm / pnpm / bun)
-
-Een 7-daagse quarantine op verse pakketversies verdedigt tegen
-supply-chain attacks (npm yankt malicious versies doorgaans binnen 24-48u —
-een 7-daagse cooldown houdt ze buiten je lockfile vóór ze opgemerkt worden).
-
-```bash
-bash common/install-pm-cooldown.sh             # default 7 dagen
-bash common/install-pm-cooldown.sh --days 14   # andere window
-bash common/install-pm-cooldown.sh --check     # alleen huidige state tonen
-```
-
-Idempotent en user-level (geen sudo). Schrijft naar:
-
-| File              | Key                            | Eenheid  | Manager       |
-|-------------------|--------------------------------|----------|---------------|
-| `~/.npmrc`        | `min-release-age`              | dagen    | npm 11.10+    |
-| `~/.npmrc`        | `minimum-release-age`          | minuten  | pnpm 10.16+   |
-| `~/.bunfig.toml`  | `[install] minimumReleaseAge`  | seconden | bun 1.3+      |
-
-Bestaande inhoud (auth tokens, registries, custom keys) en file-mode blijven
-behouden. Voor een spoedige CVE-fix die binnen het venster valt: per-project
-override via een lokale `.npmrc` / `bunfig.toml` met de waarde op `0`.
-
-### Per-project + CI
-
-`~/.npmrc` dekt alleen je eigen workstation. CI-runners draaien als een
-andere user zonder dit home-config, dus de cooldown is daar bypassed —
-precies waar supply-chain attacks in production builds landen. Drop
-daarom een **project-lokale** config in elke Node/Bun repo die je owned:
-
-```bash
-cp common/templates/project-npmrc.example         <jouw-repo>/.npmrc
-cp common/templates/project-bunfig.toml.example   <jouw-repo>/bunfig.toml
-# committen — beide files bevatten geen secrets
-```
-
-Voor projecten waar je geen file mag committen (gedeeld met teams die
-deze opinie niet delen): in plaats daarvan CI env vars zetten —
-`NPM_CONFIG_MIN_RELEASE_AGE=7` en `NPM_CONFIG_MINIMUM_RELEASE_AGE=10080`.
-Zie `common/templates/README.md` voor de volledige uitleg.
-
-## Handmatige update
-
-```bash
-sudo bash common/update.sh
-```
+Het script weigert te mailen als die file niet op mode 600/400 staat (bevat een App Password).
 
 ## WSL Support
 
-De installer + checks zijn WSL-aware. Een WSL2-Ubuntu draait de gewone
-`bootstrap.sh` → `ubuntu/install.sh`-flow; WSL2-Alma idem voor `alma/`.
-Wat afwijkt op WSL:
+De installer + checks zijn WSL-aware. Een WSL2-Ubuntu draait de gewone `bootstrap.sh` → `ubuntu/install.sh`-flow; WSL2-Alma idem voor `alma/`. Wat afwijkt op WSL:
 
 | Component | Native Linux | WSL zonder systemd | WSL met systemd-opt-in |
 |---|---|---|---|
@@ -218,15 +151,7 @@ Wat afwijkt op WSL:
 | `incident-token-revoke.sh` Linux-side | ✓ | ✓ + Windows-warning | ✓ + Windows-warning |
 | `incident-token-revoke.sh` clipboard/URL-open | wl-copy/xclip/pbcopy | clip.exe + wslview/cmd.exe | clip.exe + wslview/cmd.exe |
 
-**Waarom rkhunter op WSL bewust uit?** Op WSL geeft `rkhunter --check` veel
-false-positives (proc-checks, passwd-checks rond WSL's init-proces, en
-`system_configs.t` verwacht echte init-scripts). Een daily wall-melding
-met onbetrouwbare waarschuwingen leidt tot alarm-fatigue, wat op zichzelf
-al een ISO 27001-bevinding is ("medewerkers negeren security-alerts").
-WSL's container-achtige isolatie verandert sowieso het rootkit-bedreigings-
-model — de Windows-host is daar de relevante verdedigingslaag (Defender /
-EDR). `rkhunter-check.sh` detecteert WSL en exit 0 met uitleg; de timer
-fired wel maar produceert geen wall-spam.
+**Waarom rkhunter op WSL bewust uit?** Op WSL geeft `rkhunter --check` veel false-positives (proc-checks, passwd-checks rond WSL's init-proces, en `system_configs.t` verwacht echte init-scripts). Een daily wall-melding met onbetrouwbare waarschuwingen leidt tot alarm-fatigue, wat op zichzelf al een ISO 27001-bevinding is ("medewerkers negeren security-alerts"). WSL's container-achtige isolatie verandert sowieso het rootkit-bedreigings-model — de Windows-host is daar de relevante verdedigingslaag (Defender / EDR). `rkhunter-check.sh` detecteert WSL en exit 0 met uitleg; de timer fired wel maar produceert geen wall-spam.
 
 ### WSL2 + systemd inschakelen (aanbevolen)
 
@@ -261,11 +186,7 @@ Alles werkt behalve de timers. Voor automatische scans heb je twee opties:
 
 ### Incident response op WSL — scope-limit
 
-`incident-token-revoke.sh` detecteert WSL en print bij start een
-waarschuwing dat **persistence op de Windows-host** (Task Scheduler, HKCU
-Run-keys, startup folder) niet door dit script wordt gezien. Voor een
-volledige IR op WSL controleer je óók Windows-kant — het script print de
-exacte PowerShell + reg-commands die je daar moet draaien.
+`incident-token-revoke.sh` detecteert WSL en print bij start een waarschuwing dat **persistence op de Windows-host** (Task Scheduler, HKCU Run-keys, startup folder) niet door dit script wordt gezien. Voor een volledige IR op WSL controleer je óók Windows-kant — het script print de exacte PowerShell + reg-commands die je daar moet draaien.
 
 ## Verwijderen
 
@@ -274,3 +195,21 @@ sudo bash common/uninstall.sh
 ```
 
 Dit verwijdert de systemd timers en logrotate config. ClamAV en rkhunter packages blijven staan — verwijder die handmatig als gewenst.
+
+## Verder lezen
+
+| Doc | Voor wie |
+|-----|----------|
+| [`docs/compliance.md`](docs/compliance.md) | Auditor, security officer, sales-ondersteuning — control-mapping naar ISO 27001 / SOC 2 / NEN 7510 / BIO. |
+| [`docs/threat-model.md`](docs/threat-model.md) | Implementatie-engineers, security-reviewers — wat we wel/niet verdedigen. |
+| [`docs/supply-chain-cooldown.md`](docs/supply-chain-cooldown.md) | Devs die alleen laag 2 willen begrijpen of adopteren. |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Iedereen die een PR overweegt. |
+| [`openspec/`](openspec/) | Spec-driven changes — `proposal.md` + `tasks.md` + spec-deltas per change. |
+
+## License
+
+[EUPL-1.2](LICENSE) — European Union Public Licence v. 1.2.
+
+EUPL is OSI-approved, vrije software-licentie en breed gedragen in Europese publieke-sector projecten. De keuze is bewust: deze repo komt voort uit werk rond digitale soevereiniteit en NLnet-gesponsorde projecten, waar EUPL het natuurlijke pad is voor permissive sharing zonder afhankelijkheid van een US-juridisch kader. Compatible met de meeste copyleft- en permissive licenties (inclusief GPL, AGPL, MIT en Apache-2.0) voor afgeleide werken.
+
+SPDX-headers in elke source-file (`# SPDX-License-Identifier: EUPL-1.2`) maken de licentie machine-leesbaar voor SBOM-tools.

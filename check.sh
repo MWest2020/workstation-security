@@ -17,6 +17,8 @@ readonly SCRIPT_DIR
 # shellcheck source=/dev/null
 source "${SCRIPT_DIR}/common/lib.sh"
 
+ws_handle_version "$@"
+
 errors=0
 
 echo ""

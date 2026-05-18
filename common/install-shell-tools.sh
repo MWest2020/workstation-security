@@ -65,6 +65,10 @@ while [[ $# -gt 0 ]]; do
       only_tool="$2"
       shift 2
       ;;
+    --version | -V)
+      echo "workstation-security $(ws_version)"
+      exit 0
+      ;;
     -h | --help)
       sed -n '2,30p' "$0" | sed 's/^# //;s/^#$//'
       exit 0

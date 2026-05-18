@@ -39,9 +39,21 @@
 set -uo pipefail
 
 readonly SCRIPT_NAME="incident-token-revoke"
-readonly SCRIPT_VERSION="0.1.0"
 readonly TOKENS_URL="https://github.com/settings/tokens"
 readonly MAX_EVIDENCE_BYTES=1048576 # 1 MiB cap per evidence-file
+
+# Self-contained version reader. Het IR-script vermijdt bewust een lib.sh-source
+# (zie comment in dit bestand bij WSL-detectie: "Inline detectie — IR-script
+# blijft self-contained"). Zelfde principe hier — bij ontbrekend VERSION-bestand
+# fallt het terug op "unknown" en draait gewoon door.
+_ir_version_file="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../VERSION"
+if [[ -r "$_ir_version_file" ]]; then
+  SCRIPT_VERSION="$(cat "$_ir_version_file")"
+else
+  SCRIPT_VERSION="unknown"
+fi
+unset _ir_version_file
+readonly SCRIPT_VERSION
 
 INCIDENT_TS="$(date -u +%Y%m%dT%H%M%SZ)"
 readonly INCIDENT_TS
@@ -118,6 +130,10 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry-run) DRY_RUN=1 ;;
     --yes-neutralize) AUTO_YES_NEUTRALIZE=1 ;;
+    --version | -V)
+      echo "workstation-security ${SCRIPT_VERSION}"
+      exit 0
+      ;;
     --mail-env)
       shift
       [[ $# -gt 0 ]] || {

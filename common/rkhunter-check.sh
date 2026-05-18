@@ -18,6 +18,8 @@ readonly SCRIPT_DIR
 # shellcheck source=lib.sh
 source "${SCRIPT_DIR}/lib.sh"
 
+ws_handle_version "$@"
+
 LOG="/var/log/rkhunter.log"
 
 # WSL-skip: rkhunter geeft hier veel false-positives op /proc-checks, op de

@@ -1,8 +1,8 @@
 # workstation-security
 
 [![smoke](https://github.com/MWest2020/workstation-security/actions/workflows/smoke.yml/badge.svg)](https://github.com/MWest2020/workstation-security/actions/workflows/smoke.yml)
+[![shellcheck](https://github.com/MWest2020/workstation-security/actions/workflows/shellcheck.yml/badge.svg)](https://github.com/MWest2020/workstation-security/actions/workflows/shellcheck.yml)
 [![License: EUPL-1.2](https://img.shields.io/badge/License-EUPL_1.2-blue.svg)](LICENSE)
-[![shellcheck](https://img.shields.io/badge/shellcheck-clean-brightgreen)](.pre-commit-config.yaml)
 
 Lichtgewicht baseline voor het hardenen van developer workstations. Bedoeld om de minimale set verdedigingen op orde te hebben die je voor een ISO 27001 / SOC 2 / NEN 7510 / BIO audit moet kunnen aantonen, zonder een full-blown EDR uit te rollen.
 

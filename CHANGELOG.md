@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased — v1.0.0-release-readiness (A2 + C1-C6)
+## v1.0.0 (2026-05-18) — initial public release
 
-OpenSpec change: [`openspec/changes/v1-release-readiness/`](openspec/changes/v1-release-readiness/). Bundelt zeven kleine clusters richting v1.0.0-tag. PRs landen per cluster; tag wordt pas geplaatst als alles gemerged en CI groen is.
+OpenSpec change: [`openspec/changes/archive/2026-05-18-v1-release-readiness/`](openspec/changes/archive/2026-05-18-v1-release-readiness/). Bundelde zeven kleine clusters (A2 + C1-C6) tot één coherent v1.0.0-leveringspakket. Gemerged via PR #2; tag plaatste op `d163653` (rebased tip van main na CI groen).
 
 ### Toegevoegd
 - `VERSION`-file (top-level, semver `0.9.0`) als single source of truth voor versie. Helper `ws_version()` in `common/lib.sh` leest deze at-runtime; fallback `unknown` als de file ontbreekt (een script dat los gedownload werd faalt niet).

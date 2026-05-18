@@ -446,12 +446,31 @@ print_revoke_url() {
     Dit is en blijft een bewuste handmatige handeling.
 
 EOF
+  # Clipboard cascade: probeer in volgorde wat past bij de runtime.
+  # WSL2 heeft geen wl-copy/xclip standaard (geen X/Wayland-server zonder
+  # WSLg setup), maar clip.exe is altijd beschikbaar via /init/wsl-interop.
   if command -v wl-copy >/dev/null 2>&1; then
     printf '%s' "$TOKENS_URL" | wl-copy 2>/dev/null && log INFO "URL → clipboard (wl-copy)"
   elif command -v xclip >/dev/null 2>&1; then
     printf '%s' "$TOKENS_URL" | xclip -selection clipboard 2>/dev/null && log INFO "URL → clipboard (xclip)"
   elif command -v pbcopy >/dev/null 2>&1; then
     printf '%s' "$TOKENS_URL" | pbcopy 2>/dev/null && log INFO "URL → clipboard (pbcopy)"
+  elif command -v clip.exe >/dev/null 2>&1; then
+    # WSL2: clip.exe staat in PATH via Windows-binary-interop.
+    printf '%s' "$TOKENS_URL" | clip.exe 2>/dev/null && log INFO "URL → Windows clipboard (clip.exe)"
+  fi
+
+  # UX-bonus op WSL: open de URL direct in de Windows-default-browser.
+  # Niet vereist (URL staat ook in stdout en is geclipboard) maar in een
+  # incident wil je minder klikken tussen detect en revoke. Beide opties
+  # blijven |-2>/dev/null-stil als ze niet beschikbaar zijn.
+  if command -v wslview >/dev/null 2>&1; then
+    wslview "$TOKENS_URL" 2>/dev/null && log INFO "URL geopend via wslview"
+  elif command -v cmd.exe >/dev/null 2>&1; then
+    # cmd.exe /c start <url> opent de Windows-default-browser zonder
+    # nieuwe cmd-window. De extra "" voorkomt dat start de URL als
+    # window-title interpreteert.
+    cmd.exe /c start "" "$TOKENS_URL" 2>/dev/null && log INFO "URL geopend via cmd.exe"
   fi
 }
 

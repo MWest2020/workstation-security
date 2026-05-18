@@ -208,8 +208,21 @@ Wat afwijkt op WSL:
 | `install-shell-tools.sh` + pre-commit gates | ✓ | ✓ | ✓ |
 | systemd timers (auto-scans) | ✓ | skipped + warning | ✓ |
 | `check.sh` services/timers sectie | ✓ | skipped + WSL-uitleg | ✓ |
+| `scan.sh` ClamAV scan op `/home` | ✓ | ✓ (handmatig) | ✓ (via timer) |
 | `scan.sh` excludes `/mnt/*` (Windows drives) | n/a | auto | auto |
-| `incident-token-revoke.sh` | ✓ Linux-side | ✓ Linux-side + Windows-warning | ✓ Linux-side + Windows-warning |
+| `rkhunter-check.sh` rootkit-check | ✓ | skipped (bewust) | skipped (bewust) |
+| `incident-token-revoke.sh` Linux-side | ✓ | ✓ + Windows-warning | ✓ + Windows-warning |
+| `incident-token-revoke.sh` clipboard/URL-open | wl-copy/xclip/pbcopy | clip.exe + wslview/cmd.exe | clip.exe + wslview/cmd.exe |
+
+**Waarom rkhunter op WSL bewust uit?** Op WSL geeft `rkhunter --check` veel
+false-positives (proc-checks, passwd-checks rond WSL's init-proces, en
+`system_configs.t` verwacht echte init-scripts). Een daily wall-melding
+met onbetrouwbare waarschuwingen leidt tot alarm-fatigue, wat op zichzelf
+al een ISO 27001-bevinding is ("medewerkers negeren security-alerts").
+WSL's container-achtige isolatie verandert sowieso het rootkit-bedreigings-
+model — de Windows-host is daar de relevante verdedigingslaag (Defender /
+EDR). `rkhunter-check.sh` detecteert WSL en exit 0 met uitleg; de timer
+fired wel maar produceert geen wall-spam.
 
 ### WSL2 + systemd inschakelen (aanbevolen)
 

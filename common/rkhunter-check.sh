@@ -12,7 +12,28 @@
 #   # Doorgaans aangeroepen door ws-rkhunter.timer (dagelijks)
 set -uo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
+
+# shellcheck source=lib.sh
+source "${SCRIPT_DIR}/lib.sh"
+
 LOG="/var/log/rkhunter.log"
+
+# WSL-skip: rkhunter geeft hier veel false-positives op /proc-checks, op de
+# passwd-checks rond WSL's init-proces, en op system_configs.t (verwacht
+# echte init-scripts). Een daily wall-notificatie met onbetrouwbare
+# waarschuwingen leidt tot alarm-fatigue — dat is op zichzelf al een ISO
+# 27001-bevinding ("medewerkers negeren security-alerts"). Plus: WSL's
+# container-achtige isolatie verandert het rootkit-bedreigingsmodel
+# fundamenteel; de Windows-host is daar de relevante verdedigingslaag
+# (Defender / EDR). Boring en auditeerbaar: niet draaien wat niet zinvol is.
+if ws_is_wsl; then
+  echo "rkhunter overgeslagen op WSL — false-positives op /proc en init-checks."
+  echo "Rootkit-bedreigingsmodel verschilt op WSL (container-isolatie);"
+  echo "gebruik Microsoft Defender / een Windows-AV op de Windows-host."
+  exit 0
+fi
 
 if ! command -v rkhunter &>/dev/null; then
   echo "rkhunter niet geïnstalleerd — overgeslagen."

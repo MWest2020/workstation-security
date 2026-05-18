@@ -110,6 +110,56 @@ ensure_dir() {
   fi
 }
 
+# Verify dat een bestand de verwachte sha256 heeft. Pure check — geen
+# side-effects op het bestand zelf. Caller blijft verantwoordelijk voor
+# cleanup (rm van een tmpfile op mismatch). Reden: deze helper weet niet
+# of het een tmp-download is of een al-geïnstalleerd-binary; auto-delete
+# zou onverwacht een geïnstalleerd-binary kunnen wissen bij een verkeerd-
+# aangeroepen test of debug.
+#
+# Vereist sha256sum (coreutils). Bij mismatch: stderr + return 1.
+#
+# Ironie-fix: een tool die expliciet over supply-chain-paranoia gaat, mag zelf
+# niet binaries downloaden zonder integriteits-verificatie. Defense in depth
+# zonder veel werk — shfmt en gitleaks publiceren beide hun checksums.
+verify_sha256() {
+  local file="$1" expected="$2"
+  if ! command -v sha256sum >/dev/null 2>&1; then
+    ws_fail "sha256sum niet beschikbaar — kan checksum-verificatie niet uitvoeren"
+    return 1
+  fi
+  if [[ -z "$expected" ]]; then
+    ws_fail "Lege expected-checksum doorgegeven aan verify_sha256"
+    return 1
+  fi
+  local actual
+  actual="$(sha256sum "$file" | awk '{print $1}')"
+  if [[ "$actual" != "$expected" ]]; then
+    ws_fail "SHA-256 mismatch op $(basename "$file"):"
+    ws_info "  Expected: ${expected}"
+    ws_info "  Actual:   ${actual}"
+    return 1
+  fi
+  return 0
+}
+
+# Haal de verwachte sha256 op uit een upstream-published checksums-file.
+# Format: '<sha256>  <filename>' per regel (standaard sha256sum -c format).
+# Op fail (curl error, asset niet in file): return 1 + lege output.
+fetch_expected_sha256() {
+  local sums_url="$1" asset_name="$2"
+  local sums_content
+  if ! sums_content="$(curl -fsSL "$sums_url" 2>/dev/null)"; then
+    return 1
+  fi
+  local sha
+  sha="$(echo "$sums_content" | awk -v a="$asset_name" '$2 == a {print $1; exit}')"
+  if [[ -z "$sha" ]]; then
+    return 1
+  fi
+  printf '%s' "$sha"
+}
+
 # ---------------------------------------------------------------------------
 # shfmt — formatter, used in --check mode in pre-commit
 # ---------------------------------------------------------------------------
@@ -129,11 +179,28 @@ install_shfmt() {
     ws_info "shfmt upgrade: ${current} → ${SHFMT_VERSION}"
   fi
 
-  url="https://github.com/mvdan/sh/releases/download/v${SHFMT_VERSION}/shfmt_v${SHFMT_VERSION}_${os}_${arch}"
+  local asset_name="shfmt_v${SHFMT_VERSION}_${os}_${arch}"
+  url="https://github.com/mvdan/sh/releases/download/v${SHFMT_VERSION}/${asset_name}"
+  local sums_url="https://github.com/mvdan/sh/releases/download/v${SHFMT_VERSION}/sha256sums.txt"
+
+  local expected_sha
+  if ! expected_sha="$(fetch_expected_sha256 "$sums_url" "$asset_name")"; then
+    ws_fail "Kon expected sha256 niet ophalen voor ${asset_name}"
+    ws_info "  Checked: ${sums_url}"
+    return 1
+  fi
+
   ensure_dir "$LOCAL_BIN"
-  curl -fsSL "$url" -o "$dest"
+  local tmp_file
+  tmp_file="$(mktemp)"
+  curl -fsSL "$url" -o "$tmp_file"
+  if ! verify_sha256 "$tmp_file" "$expected_sha"; then
+    rm -f "$tmp_file"
+    return 1
+  fi
+  mv "$tmp_file" "$dest"
   chmod +x "$dest"
-  ws_ok "installed shfmt ${SHFMT_VERSION} → ${dest}"
+  ws_ok "installed shfmt ${SHFMT_VERSION} → ${dest} (sha256 verified)"
 }
 
 # ---------------------------------------------------------------------------
@@ -165,14 +232,28 @@ install_gitleaks() {
       return 1
       ;;
   esac
-  url="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_${os}_${gl_arch}.tar.gz"
+  local asset_name="gitleaks_${GITLEAKS_VERSION}_${os}_${gl_arch}.tar.gz"
+  url="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${asset_name}"
+  local sums_url="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+
+  local expected_sha
+  if ! expected_sha="$(fetch_expected_sha256 "$sums_url" "$asset_name")"; then
+    ws_fail "Kon expected sha256 niet ophalen voor ${asset_name}"
+    ws_info "  Checked: ${sums_url}"
+    return 1
+  fi
+
   ensure_dir "$LOCAL_BIN"
   tarball="$(mktemp)"
   curl -fsSL "$url" -o "$tarball"
+  if ! verify_sha256 "$tarball" "$expected_sha"; then
+    rm -f "$tarball"
+    return 1
+  fi
   tar -xzf "$tarball" -C "$LOCAL_BIN" gitleaks
   rm -f "$tarball"
   chmod +x "$dest"
-  ws_ok "installed gitleaks ${GITLEAKS_VERSION} → ${dest}"
+  ws_ok "installed gitleaks ${GITLEAKS_VERSION} → ${dest} (sha256 verified)"
 }
 
 # ---------------------------------------------------------------------------

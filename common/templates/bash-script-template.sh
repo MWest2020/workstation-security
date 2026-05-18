@@ -39,6 +39,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC2034  # template-skeleton; SCRIPT_DIR is used by consumer code
 readonly SCRIPT_DIR
 
 # ---------------------------------------------------------------------------
@@ -66,7 +67,10 @@ readonly FOO_DEFAULT="bar"
 # Helpers
 # ---------------------------------------------------------------------------
 log() { printf '[%s] %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$*"; }
-die() { log "ERROR: $*" >&2; exit 1; }
+die() {
+  log "ERROR: $*" >&2
+  exit 1
+}
 
 # ---------------------------------------------------------------------------
 # Main
@@ -76,11 +80,15 @@ main() {
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --foo) foo="$2"; shift 2 ;;
-      -h|--help)
+      --foo)
+        foo="$2"
+        shift 2
+        ;;
+      -h | --help)
         # Print the header docblock as help text
         sed -n '2,40p' "$0" | sed 's/^# //;s/^#$//'
-        exit 0 ;;
+        exit 0
+        ;;
       *) die "Onbekend argument: $1" ;;
     esac
   done

@@ -79,7 +79,7 @@ check_one() {
     file_violations=$((file_violations + 1))
   else
     case "$role" in
-      entrypoint|library|container-entrypoint|installer|tool) ;;
+      entrypoint | library | container-entrypoint | installer | tool) ;;
       *)
         ws_fail "${file} — unknown role '${role}' (must be entrypoint|library|container-entrypoint|installer|tool)"
         file_violations=$((file_violations + 1))
@@ -125,15 +125,19 @@ main() {
 
   case "$1" in
     --all)
-      mode="all"; target="${2:-}"; shift 2 || true
+      mode="all"
+      target="${2:-}"
+      shift 2 || true
       if [[ -z "$target" || ! -d "$target" ]]; then
-        ws_fail "--all needs a directory argument"; exit 2
+        ws_fail "--all needs a directory argument"
+        exit 2
       fi
       ;;
     --pre-commit)
-      mode="stdin"; shift
+      mode="stdin"
+      shift
       ;;
-    -h|--help)
+    -h | --help)
       sed -n '2,30p' "$0" | sed 's/^# //;s/^#$//'
       exit 0
       ;;

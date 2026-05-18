@@ -21,7 +21,7 @@ source "${SCRIPT_DIR}/lib.sh"
 
 # --- Dagelijkse signature/database update ---
 
-cat > "$UNIT_DIR/av-update.service" <<UNIT
+cat >"$UNIT_DIR/av-update.service" <<UNIT
 [Unit]
 Description=ClamAV + rkhunter dagelijkse update
 
@@ -30,7 +30,7 @@ Type=oneshot
 ExecStart=/bin/bash $SCRIPT_DIR/update.sh
 UNIT
 
-cat > "$UNIT_DIR/av-update.timer" <<'UNIT'
+cat >"$UNIT_DIR/av-update.timer" <<'UNIT'
 [Unit]
 Description=Dagelijkse AV signature update (04:00)
 
@@ -44,7 +44,7 @@ UNIT
 
 # --- Dagelijkse ClamAV scan ---
 
-cat > "$UNIT_DIR/clamav-scan.service" <<UNIT
+cat >"$UNIT_DIR/clamav-scan.service" <<UNIT
 [Unit]
 Description=ClamAV dagelijkse scan
 After=clamav-freshclam.service
@@ -54,7 +54,7 @@ Type=oneshot
 ExecStart=/bin/bash $SCRIPT_DIR/scan.sh
 UNIT
 
-cat > "$UNIT_DIR/clamav-scan.timer" <<'UNIT'
+cat >"$UNIT_DIR/clamav-scan.timer" <<'UNIT'
 [Unit]
 Description=Dagelijkse ClamAV scan (02:00)
 
@@ -68,7 +68,7 @@ UNIT
 
 # --- Dagelijkse rkhunter check ---
 
-cat > "$UNIT_DIR/rkhunter-check.service" <<UNIT
+cat >"$UNIT_DIR/rkhunter-check.service" <<UNIT
 [Unit]
 Description=rkhunter dagelijkse rootkit check
 
@@ -77,7 +77,7 @@ Type=oneshot
 ExecStart=/bin/bash $SCRIPT_DIR/rkhunter-check.sh
 UNIT
 
-cat > "$UNIT_DIR/rkhunter-check.timer" <<'UNIT'
+cat >"$UNIT_DIR/rkhunter-check.timer" <<'UNIT'
 [Unit]
 Description=Dagelijkse rkhunter check (03:00)
 

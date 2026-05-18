@@ -41,7 +41,7 @@ set -uo pipefail
 readonly SCRIPT_NAME="incident-token-revoke"
 readonly SCRIPT_VERSION="0.1.0"
 readonly TOKENS_URL="https://github.com/settings/tokens"
-readonly MAX_EVIDENCE_BYTES=1048576   # 1 MiB cap per evidence-file
+readonly MAX_EVIDENCE_BYTES=1048576 # 1 MiB cap per evidence-file
 
 INCIDENT_TS="$(date -u +%Y%m%dT%H%M%SZ)"
 readonly INCIDENT_TS
@@ -76,9 +76,12 @@ readonly HEURISTIC_DIRS=(
 readonly HEURISTIC_PATTERN='api\.github\.com/user|gh-token-monitor|rm[[:space:]]+-rf[[:space:]]+(\$HOME|~)'
 
 case "$(uname -s)" in
-  Linux*)  OS="linux" ;;
+  Linux*) OS="linux" ;;
   Darwin*) OS="macos" ;;
-  *) echo "FATAL: unsupported OS: $(uname -s)" >&2; exit 2 ;;
+  *)
+    echo "FATAL: unsupported OS: $(uname -s)" >&2
+    exit 2
+    ;;
 esac
 
 # ---------- argumenten ----------
@@ -93,10 +96,13 @@ while [[ $# -gt 0 ]]; do
     --yes-neutralize) AUTO_YES_NEUTRALIZE=1 ;;
     --mail-env)
       shift
-      [[ $# -gt 0 ]] || { echo "--mail-env vereist een pad" >&2; exit 2; }
+      [[ $# -gt 0 ]] || {
+        echo "--mail-env vereist een pad" >&2
+        exit 2
+      }
       MAIL_ENV_FILE="$1"
       ;;
-    -h|--help)
+    -h | --help)
       cat <<EOF
 Usage: $0 [--dry-run] [--yes-neutralize] [--mail-env <path>] [-h]
 
@@ -114,7 +120,10 @@ Schone runs laten niks op disk achter.
 EOF
       exit 0
       ;;
-    *) echo "Unknown arg: $1" >&2; exit 2 ;;
+    *)
+      echo "Unknown arg: $1" >&2
+      exit 2
+      ;;
   esac
   shift
 done
@@ -125,13 +134,14 @@ ensure_incident_dir() {
   if [[ $INCIDENT_DIR_CREATED -eq 0 ]]; then
     mkdir -p "$INCIDENT_DIR" && chmod 0700 "$INCIDENT_DIR"
     LOG_FILE="${INCIDENT_DIR}/incident.log"
-    : > "$LOG_FILE"
+    : >"$LOG_FILE"
     INCIDENT_DIR_CREATED=1
   fi
 }
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   local msg="$*"
   local ts
   ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -142,7 +152,7 @@ log() {
     ensure_incident_dir
   fi
   if [[ -n "$LOG_FILE" ]]; then
-    printf '%s\n' "$line" >> "$LOG_FILE" 2>/dev/null || true
+    printf '%s\n' "$line" >>"$LOG_FILE" 2>/dev/null || true
   fi
 }
 
@@ -167,7 +177,7 @@ archive() {
   # Cap op MAX_EVIDENCE_BYTES — payloads zijn klein, maar bescherming tegen
   # symlink naar /dev/urandom of een opzettelijk opgeblazen artefact.
   if [[ -f "$src" ]]; then
-    head -c "$MAX_EVIDENCE_BYTES" "$src" > "$dest" 2>/dev/null || true
+    head -c "$MAX_EVIDENCE_BYTES" "$src" >"$dest" 2>/dev/null || true
     local actual
     actual="$(stat -c '%s' "$src" 2>/dev/null || stat -f '%z' "$src" 2>/dev/null || echo 0)"
     if [[ "$actual" -gt "$MAX_EVIDENCE_BYTES" ]]; then
@@ -177,7 +187,7 @@ archive() {
     fi
   else
     # niet-regular file (dir, symlink) — sla metadata op, geen recursive copy
-    ls -ld "$src" > "$dest" 2>/dev/null || true
+    ls -ld "$src" >"$dest" 2>/dev/null || true
     log INFO "archived metadata: $src -> $dest"
   fi
 }
@@ -275,7 +285,7 @@ detect_processes() {
   if [[ -n "$pids" ]]; then
     while IFS= read -r line; do
       [[ -n "$line" ]] && flag_artifact "process" "$line"
-    done <<< "$pids"
+    done <<<"$pids"
   fi
 }
 
@@ -292,7 +302,8 @@ neutralize_processes_first() {
     systemctl --user kill --signal=SIGKILL "$LINUX_UNIT_NAME" 2>/dev/null || true
   fi
   if [[ "$OS" == "macos" ]] && command -v launchctl >/dev/null 2>&1; then
-    local uid; uid="$(id -u)"
+    local uid
+    uid="$(id -u)"
     launchctl kill SIGKILL "gui/${uid}/${MACOS_LABEL}" 2>/dev/null || true
   fi
   sleep 1
@@ -321,7 +332,8 @@ neutralize_linux() {
 neutralize_macos() {
   log INFO "ontwapenen macOS artefacten"
   if command -v launchctl >/dev/null 2>&1; then
-    local uid; uid="$(id -u)"
+    local uid
+    uid="$(id -u)"
     launchctl bootout "gui/${uid}/${MACOS_LABEL}" 2>/dev/null \
       || launchctl unload -w "$MACOS_PLIST" 2>/dev/null \
       || true
@@ -380,7 +392,7 @@ local_invalidate() {
   fi
   local rc
   for rc in "$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.profile" \
-            "$HOME/.zshrc" "$HOME/.zprofile" "$HOME/.netrc"; do
+    "$HOME/.zshrc" "$HOME/.zprofile" "$HOME/.netrc"; do
     [[ -f "$rc" ]] || continue
     if grep -qE 'GH_TOKEN|GITHUB_TOKEN|GH_ENTERPRISE_TOKEN|github\.com.+password' "$rc" 2>/dev/null; then
       log WARN "token-referentie in $rc — handmatig opschonen"
@@ -443,10 +455,13 @@ send_mail_if_configured() {
   fi
   local perm
   perm="$(stat -c '%a' "$MAIL_ENV_FILE" 2>/dev/null \
-        || stat -f '%Lp' "$MAIL_ENV_FILE" 2>/dev/null || echo "")"
+    || stat -f '%Lp' "$MAIL_ENV_FILE" 2>/dev/null || echo "")"
   case "$perm" in
-    600|400) ;;
-    *) log WARN "$MAIL_ENV_FILE mode=$perm (vereist 600/400) — mail overgeslagen"; return 0 ;;
+    600 | 400) ;;
+    *)
+      log WARN "$MAIL_ENV_FILE mode=$perm (vereist 600/400) — mail overgeslagen"
+      return 0
+      ;;
   esac
   # shellcheck disable=SC1090
   source "$MAIL_ENV_FILE"
@@ -477,7 +492,7 @@ send_mail_if_configured() {
       "${#FOUND_ARTIFACTS[@]}" "${STOLEN_HASH:-(none)}" "${STOLEN_LAST4:-(none)}"
     printf '\r\n--- log (tail 100) ---\r\n'
     [[ -f "$LOG_FILE" ]] && tail -n 100 "$LOG_FILE"
-  } > "$body"
+  } >"$body"
 
   curl --silent --ssl-reqd \
     --url "smtps://${MAIL_SMTP_HOST}:${MAIL_SMTP_PORT}" \

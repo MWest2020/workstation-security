@@ -90,7 +90,7 @@ repos:
     hooks:
       - id: shell-headers
         name: shell-header convention check
-        entry: ~/projects/workstation-security/common/check-shell-headers.sh
+        entry: common/check-shell-headers.sh
         language: system
         files: \.sh$
         # Faalt als een .sh file mist:

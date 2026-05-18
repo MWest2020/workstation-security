@@ -57,12 +57,22 @@ only_tool=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --check)  mode="check"; shift ;;
-    --tool)   only_tool="$2"; shift 2 ;;
-    -h|--help)
+    --check)
+      mode="check"
+      shift
+      ;;
+    --tool)
+      only_tool="$2"
+      shift 2
+      ;;
+    -h | --help)
       sed -n '2,30p' "$0" | sed 's/^# //;s/^#$//'
-      exit 0 ;;
-    *) ws_fail "Onbekend argument: $1"; exit 1 ;;
+      exit 0
+      ;;
+    *)
+      ws_fail "Onbekend argument: $1"
+      exit 1
+      ;;
   esac
 done
 
@@ -72,17 +82,23 @@ done
 arch_for_binary() {
   # Return: amd64 | arm64 — used in shfmt/gitleaks download URLs
   case "$(uname -m)" in
-    x86_64)  echo "amd64" ;;
-    aarch64|arm64) echo "arm64" ;;
-    *) ws_fail "Unsupported arch: $(uname -m)"; return 1 ;;
+    x86_64) echo "amd64" ;;
+    aarch64 | arm64) echo "arm64" ;;
+    *)
+      ws_fail "Unsupported arch: $(uname -m)"
+      return 1
+      ;;
   esac
 }
 
 os_for_binary() {
   case "$(uname -s)" in
-    Linux)  echo "linux" ;;
+    Linux) echo "linux" ;;
     Darwin) echo "darwin" ;;
-    *) ws_fail "Unsupported OS: $(uname -s)"; return 1 ;;
+    *)
+      ws_fail "Unsupported OS: $(uname -s)"
+      return 1
+      ;;
   esac
 }
 
@@ -144,7 +160,10 @@ install_gitleaks() {
   case "$arch" in
     amd64) gl_arch="x64" ;;
     arm64) gl_arch="arm64" ;;
-    *) ws_fail "Unsupported arch for gitleaks: ${arch}"; return 1 ;;
+    *)
+      ws_fail "Unsupported arch for gitleaks: ${arch}"
+      return 1
+      ;;
   esac
   url="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_${os}_${gl_arch}.tar.gz"
   ensure_dir "$LOCAL_BIN"
@@ -250,11 +269,14 @@ main() {
     install_jscpd
   else
     case "$only_tool" in
-      shfmt)      install_shfmt ;;
-      gitleaks)   install_gitleaks ;;
+      shfmt) install_shfmt ;;
+      gitleaks) install_gitleaks ;;
       pre-commit) install_pre_commit ;;
-      jscpd)      install_jscpd ;;
-      *) ws_fail "Onbekende tool: ${only_tool}"; exit 1 ;;
+      jscpd) install_jscpd ;;
+      *)
+        ws_fail "Onbekende tool: ${only_tool}"
+        exit 1
+        ;;
     esac
   fi
 

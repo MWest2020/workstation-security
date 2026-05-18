@@ -61,7 +61,10 @@ parse_args() {
         days="$1"
         ;;
       --check) mode="check" ;;
-      -h|--help) usage; exit 0 ;;
+      -h | --help)
+        usage
+        exit 0
+        ;;
       *)
         echo "error: onbekend argument: $1" >&2
         exit 2
@@ -69,7 +72,7 @@ parse_args() {
     esac
     shift
   done
-  if ! [[ "$days" =~ ^[0-9]+$ ]] || (( days < 1 )); then
+  if ! [[ "$days" =~ ^[0-9]+$ ]] || ((days < 1)); then
     echo "error: --days moet positief geheel getal zijn (kreeg: $days)" >&2
     exit 2
   fi
@@ -107,9 +110,9 @@ upsert_kv() {
       }
       { print }
       END { if (!seen) printf "%s=%s\n", k, v }
-    ' "$file" > "$tmp"
+    ' "$file" >"$tmp"
   else
-    printf '%s=%s\n' "$key" "$value" > "$tmp"
+    printf '%s=%s\n' "$key" "$value" >"$tmp"
   fi
   write_preserving_mode "$file" "$tmp"
   rm -f "$tmp"
@@ -152,12 +155,12 @@ upsert_bunfig() {
           }
         }
       }
-    ' "$file" > "$tmp"
+    ' "$file" >"$tmp"
   else
     {
       printf '[install]\n'
       printf 'minimumReleaseAge = %s\n' "$age"
-    } > "$tmp"
+    } >"$tmp"
   fi
   write_preserving_mode "$file" "$tmp"
   rm -f "$tmp"
@@ -196,8 +199,8 @@ main() {
   fi
 
   local npm_days="$days"
-  local pnpm_minutes=$(( days * 24 * 60 ))
-  local bun_seconds=$(( days * 24 * 60 * 60 ))
+  local pnpm_minutes=$((days * 24 * 60))
+  local bun_seconds=$((days * 24 * 60 * 60))
 
   echo "Installing ${days}-day package-manager cooldown..."
 

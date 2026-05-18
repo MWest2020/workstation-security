@@ -56,7 +56,7 @@ readonly WS_CLAMAV_DAEMON_CANDIDATES=(
 )
 
 # --- output helpers (alle status-messages indented voor leesbaar overzicht) ---
-ws_ok()   { printf '  %s %s\n' "$WS_PASS" "$*"; }
+ws_ok() { printf '  %s %s\n' "$WS_PASS" "$*"; }
 ws_fail() { printf '  %s %s\n' "$WS_FAIL" "$*" >&2; }
 ws_warn() { printf '  %s %s\n' "$WS_WARN" "$*" >&2; }
 ws_skip() { printf '  %s %s\n' "$WS_SKIP" "$*"; }

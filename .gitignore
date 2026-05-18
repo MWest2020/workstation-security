@@ -21,3 +21,8 @@ incident-token-revoke.env
 *.swp
 *.swo
 *~
+
+# Tool output
+# jscpd HTML reports (pre-commit hook output)
+report/
+.pre-commit-cache/

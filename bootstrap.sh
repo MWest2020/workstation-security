@@ -41,19 +41,19 @@ dispatch() {
 }
 
 case "${ID:-}" in
-  almalinux|rocky|centos|rhel|fedora|ol)
+  almalinux | rocky | centos | rhel | fedora | ol)
     dispatch alma
     ;;
-  arch|manjaro|endeavouros|artix)
+  arch | manjaro | endeavouros | artix)
     dispatch arch
     ;;
-  ubuntu|debian|linuxmint|pop|elementary|raspbian)
+  ubuntu | debian | linuxmint | pop | elementary | raspbian)
     dispatch ubuntu
     ;;
   *)
     # Fallback via ID_LIKE.
     case "${ID_LIKE:-}" in
-      *rhel*|*fedora*|*centos*)
+      *rhel* | *fedora* | *centos*)
         echo "  (ID=${ID:-?} onbekend, ID_LIKE=${ID_LIKE} → alma)"
         dispatch alma
         ;;
@@ -61,7 +61,7 @@ case "${ID:-}" in
         echo "  (ID=${ID:-?} onbekend, ID_LIKE=${ID_LIKE} → arch)"
         dispatch arch
         ;;
-      *debian*|*ubuntu*)
+      *debian* | *ubuntu*)
         echo "  (ID=${ID:-?} onbekend, ID_LIKE=${ID_LIKE} → ubuntu)"
         dispatch ubuntu
         ;;

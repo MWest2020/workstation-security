@@ -66,7 +66,7 @@ echo "Signatures:"
 # shellcheck disable=SC2012  # bekend pad, geen speciale tekens
 sig_file=$(ls -t /var/lib/clamav/daily.c?d /var/lib/clamav/main.c?d 2>/dev/null | head -1)
 if [[ -n "$sig_file" ]]; then
-  sig_age=$(( ( $(date +%s) - $(stat -c %Y "$sig_file") ) / 86400 ))
+  sig_age=$((($(date +%s) - $(stat -c %Y "$sig_file")) / 86400))
   if [[ $sig_age -le 3 ]]; then
     ws_ok "ClamAV signatures (${sig_age} dagen oud)"
   else
@@ -80,7 +80,7 @@ fi
 
 if command -v rkhunter &>/dev/null; then
   if [[ -r /var/lib/rkhunter/db/rkhunter.dat ]]; then
-    rk_age=$(( ( $(date +%s) - $(stat -c %Y /var/lib/rkhunter/db/rkhunter.dat) ) / 86400 ))
+    rk_age=$((($(date +%s) - $(stat -c %Y /var/lib/rkhunter/db/rkhunter.dat)) / 86400))
     if [[ $rk_age -le 3 ]]; then
       ws_ok "rkhunter database (${rk_age} dagen oud)"
     else
@@ -125,5 +125,5 @@ if [[ $errors -eq 0 ]]; then
 else
   echo "$errors probleem/problemen gevonden."
   # Cap exit-code op 2 — exit-codes boven 125 hebben in shell speciale betekenis.
-  exit $(( errors > 2 ? 2 : errors ))
+  exit $((errors > 2 ? 2 : errors))
 fi

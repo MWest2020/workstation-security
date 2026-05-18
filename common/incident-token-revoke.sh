@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: EUPL-1.2
+# role: tool
+#
 # Style-afwijkingen t.o.v. Google Shell Style baseline (zie ~/.claude/CLAUDE.md):
 #   1. Shebang via `env bash` i.p.v. `/bin/bash` — repo target o.a. macOS,
 #      waar /bin/bash nog 3.2 uit 2007 is. `env` vindt de homebrew bash 5.x.

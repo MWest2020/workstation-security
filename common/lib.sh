@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: EUPL-1.2
+# role: library
+#
 # common/lib.sh — gedeelde helpers en single source of truth voor de unit-set.
 #
 # Source dit bestand vanuit andere scripts; voer het niet zelfstandig uit. De

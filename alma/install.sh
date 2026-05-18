@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: EUPL-1.2
+# role: installer
+#
 # install.sh — ClamAV + rkhunter voor Alma Linux (dnf).
 # Style-afwijking: shebang via `env bash` voor consistentie met repo.
+#
+# Usage:
+#   sudo bash alma/install.sh    # dnf install ClamAV + rkhunter, enable services, install timers
+
 set -euo pipefail
 
 # shellcheck source=/dev/null

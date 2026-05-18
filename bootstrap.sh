@@ -1,8 +1,15 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: EUPL-1.2
+# role: installer
+#
 # bootstrap.sh — detecteer OS via /etc/os-release en dispatch naar de juiste
 # install.sh. Reduceert friction: gebruiker hoeft niet zelf te weten of 'ie
 # alma/, arch/ of ubuntu/ moet aanroepen.
 # Style-afwijking: shebang via `env bash` voor consistentie met repo.
+#
+# Usage:
+#   sudo bash bootstrap.sh    # detecteert OS en dispatcht naar alma/arch/ubuntu install.sh
+
 set -euo pipefail
 
 if [[ $EUID -ne 0 ]]; then

@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: EUPL-1.2
+# role: library
+#
 # common/install-base.sh — gedeelde install-helpers voor alma/arch/ubuntu.
 #
 # Source dit vanuit een OS-specifiek install.sh; voer het niet zelfstandig uit.

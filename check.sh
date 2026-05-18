@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: EUPL-1.2
+# role: tool
+#
 # check.sh — controleer of ClamAV en rkhunter correct draaien.
 # Exit-code is gelijk aan het aantal gevonden problemen (capped op 2), zodat
 # cron/CI kan detecteren wanneer er iets niet klopt.
 # Style-afwijking: shebang via `env bash` voor consistentie met repo.
+#
+# Usage:
+#   bash check.sh             # read-only audit; exit-code = aantal problemen (capped op 2)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

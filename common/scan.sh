@@ -1,8 +1,15 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: EUPL-1.2
+# role: tool
+#
 # scan.sh — dagelijkse ClamAV scan met exclude-patterns en notificatie bij vondsten.
 # Style-afwijking: shebang `env bash` voor consistentie met repo. `set -e` UIT:
 # clamscan retourneert exit 1 bij gevonden infecties — dat is precies wat we
 # moeten DETECTEREN (en via `wall` melden), niet aborten op.
+#
+# Usage:
+#   bash common/scan.sh                  # interactieve scan (geen root nodig voor $HOME)
+#   # Doorgaans aangeroepen door ws-scan.timer (dagelijks)
 set -uo pipefail
 
 LOG="/var/log/clamav/daily-scan.log"

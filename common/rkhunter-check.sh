@@ -1,8 +1,15 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: EUPL-1.2
+# role: tool
+#
 # rkhunter-check.sh — dagelijkse rkhunter check met notificatie bij waarschuwingen.
 # Style-afwijking: shebang `env bash` voor consistentie met repo. `set -e` UIT:
 # rkhunter --check retourneert non-zero bij gevonden warnings — dat is precies
 # wat we moeten DETECTEREN (en via `wall` melden), niet aborten op.
+#
+# Usage:
+#   sudo bash common/rkhunter-check.sh   # rkhunter scant /etc, /usr, /bin — root nodig
+#   # Doorgaans aangeroepen door ws-rkhunter.timer (dagelijks)
 set -uo pipefail
 
 LOG="/var/log/rkhunter.log"

@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: EUPL-1.2
+# role: tool
+#
 # uninstall.sh — verwijder systemd timers, unit files en logrotate config.
 # Style-afwijking: shebang via `env bash` voor consistentie met repo.
+#
+# Usage:
+#   sudo bash common/uninstall.sh    # disable + remove timers/services/logrotate; ClamAV/rkhunter pkg blijft
+
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -1,0 +1,100 @@
+# Pre-commit configuratie voor shell-heavy repos.
+#
+# Drop in als <repo>/.pre-commit-config.yaml en draai éénmalig:
+#   pre-commit install
+#
+# Daarna draait elke commit automatisch alle hooks tegen de gewijzigde files.
+# Manueel draaien (alle files):
+#   pre-commit run --all-files
+#
+# Belangrijke design-keuze: alle hooks gebruiken --check / read-only varianten.
+# We voeren NOOIT format-on-write of fix-on-write hooks uit. Reden: anders gaan
+# CI en lokaal stil uit elkaar lopen — een ontwikkelaar commit, hook fixt
+# stilletjes, push, en CI faalt op iets anders dan wat de auteur zag. Beter:
+# expliciet `shfmt -w` of `shellcheck --fix` lokaal draaien wanneer de hook
+# faalt. Hook is poortwachter, niet auto-correct.
+#
+# Bron-conventie: install-shell-tools.sh (workstation-security/common).
+
+repos:
+  # -------------------------------------------------------------------------
+  # ShellCheck — syntactische / common-bug detectie
+  # -------------------------------------------------------------------------
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.10.0.1
+    hooks:
+      - id: shellcheck
+        name: shellcheck
+        # Disabled checks per-project: documenteer in een comment hieronder
+        # waarom. Geen blanket disable zonder reden.
+        args: [--severity=warning]
+
+  # -------------------------------------------------------------------------
+  # shfmt — formatter, alleen --check (geen --write)
+  # -------------------------------------------------------------------------
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: v3.10.0-2
+    hooks:
+      - id: shfmt
+        name: shfmt --check
+        # -i 2: 2-space indent (Google Shell Style)
+        # -ci: indent switch cases
+        # -bn: binary ops at start of line
+        args: [-d, -i, "2", -ci, -bn]
+
+  # -------------------------------------------------------------------------
+  # gitleaks — secret-scanning. Geen exceptions in deze hook; allowlist via
+  # .gitleaks.toml in repo root als false positives optreden.
+  # -------------------------------------------------------------------------
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.6
+    hooks:
+      - id: gitleaks
+
+  # -------------------------------------------------------------------------
+  # jscpd — duplication-detector. Threshold conservatief (50 tokens / ~10
+  # regels) zodat we copy-paste vangen zonder noise op kleine helpers.
+  # Per-project tuning via .jscpd.json in repo root.
+  # -------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: jscpd
+        name: jscpd (duplication detector)
+        entry: jscpd
+        language: system
+        pass_filenames: false
+        # --silent: alleen exit-code, geen verbose output (output via report file)
+        # --threshold 0: geen tolerance — elke gevonden duplicate faalt
+        # --min-tokens 50: ~10 regels minimaal voordat we het flaggen
+        # --reporters html: HTML rapport in ./report/jscpd-report.html
+        args:
+          [
+            "--silent",
+            "--threshold",
+            "0",
+            "--min-tokens",
+            "50",
+            "--reporters",
+            "html",
+            "--output",
+            "./report",
+            ".",
+          ]
+
+  # -------------------------------------------------------------------------
+  # Custom: shell-header validator (uit workstation-security)
+  # Symlink of copy common/check-shell-headers.sh naar <repo>/scripts/ of
+  # rechtstreeks aanroepen vanuit workstation-security.
+  # -------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: shell-headers
+        name: shell-header convention check
+        entry: ~/projects/workstation-security/common/check-shell-headers.sh
+        language: system
+        files: \.sh$
+        # Faalt als een .sh file mist:
+        #   - shebang #!/usr/bin/env bash (of #!/bin/bash)
+        #   - SPDX-License-Identifier
+        #   - role: marker
+        #   - set -euo pipefail (alleen voor role=entrypoint of installer)

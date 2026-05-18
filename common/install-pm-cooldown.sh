@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: EUPL-1.2
+# role: installer
+#
 # Style-afwijking: shebang via `env bash` (niet `/bin/bash` zoals Google
 # Shell Style aanbeveelt). Reden: repo target o.a. macOS, waar /bin/bash
 # nog steeds 3.2 uit 2007 is (Apple update niet i.v.m. GPLv3). Met `env`
 # wordt de homebrew bash 5.x gevonden. Rest van de baseline volgt Google.
+#
 # common/install-pm-cooldown.sh — installeer 7-daagse cooldown voor npm, pnpm
 # en bun. Refuseert pakketversies gepubliceerd in de afgelopen N dagen — npm
 # yankt malicious versies doorgaans binnen 24-48u, dus een 7-daagse quarantine

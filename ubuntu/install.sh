@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: EUPL-1.2
+# role: installer
+#
 # install.sh — ClamAV + rkhunter voor Ubuntu/Debian (apt).
 # Style-afwijking: shebang via `env bash` voor consistentie met repo.
+#
+# Usage:
+#   sudo bash ubuntu/install.sh    # apt install ClamAV + rkhunter, enable services, install timers
+
 set -euo pipefail
 
 # shellcheck source=/dev/null

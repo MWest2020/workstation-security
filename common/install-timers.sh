@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: EUPL-1.2
+# role: installer
+#
 # install-timers.sh — systemd timers voor dagelijkse updates en scans.
 # Heredocs hieronder zijn de canonieke unit-definities; namen moeten matchen
 # met WS_TIMERS / WS_SERVICES_GENERATED in common/lib.sh (smoke-test onderaan).
+#
+# Usage:
+#   sudo bash common/install-timers.sh   # schrijft unit files naar /etc/systemd/system en enable't timers
 # Style-afwijking: shebang via `env bash` i.p.v. `/bin/bash` — repo target
 # o.a. macOS; rest van repo gebruikt al `env bash`.
 set -euo pipefail

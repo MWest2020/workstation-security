@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: EUPL-1.2
+# role: installer
+#
 # update.sh — ClamAV signatures + rkhunter database bijwerken
 # Probeert ook rkhunter te installeren als het nog niet aanwezig is maar nu wel beschikbaar via dnf/pacman/apt
+#
+# Usage:
+#   sudo bash common/update.sh    # update ClamAV sigs + rkhunter db; ook aangeroepen door ws-update.timer
+
 set -euo pipefail
 
 echo "==> ClamAV signatures bijwerken..."

@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-05-18
+
+### Toegevoegd
+- `common/install-shell-tools.sh` — user-level installer voor de shell-tooling-stack (shfmt v3.10.0, gitleaks v8.30.6, pre-commit, jscpd). Aanvullend op shellcheck (distro pkg). Idempotent: re-run upserts, pinned versies worden overgeslagen als al geïnstalleerd. Routes via `~/.local/bin/` en `~/.npm-global/bin/` (laatste via `npm config set prefix --location=user`, niet sudo). Detecteert OS+arch automatisch voor binary downloads. `--check` voor read-only state, `--tool <name>` voor selectieve install. Aanleiding: review van Hydra PR #269 surfaced dat `set -euo pipefail`, env-loading-duplicatie en jq-filter-copy-paste alleen automatisch gevangen worden met een gestapelde tool-set (zie [ConductionNL/hydra#280](https://github.com/ConductionNL/hydra/issues/280)). Tools werken als gates (`--check`/read-only) — geen auto-fix, consistent met `iso-audit`'s pre-commit-philosophie.
+- `common/check-shell-headers.sh` — header-convention validator voor `.sh` files. Controleert: shebang (`#!/usr/bin/env bash` of `#!/bin/bash`), `SPDX-License-Identifier` in eerste 5 regels, `# role: <entrypoint|library|container-entrypoint|installer|tool>` marker, `set -euo pipefail` voor role=entrypoint/installer, en een `# Usage:` block voor role=entrypoint/installer/tool. Standalone uitvoerbaar (`<file>` / `--all <dir>` / `--pre-commit` voor hook-mode-stdin). Exit-code = aantal violations. Read-only, geen side effects. ISO 27001-context: `grep -rn '^# role:' scripts/` toont in één oog-oogslag alle process-boundaries van een repo — auditeerbaar zonder de hele file te moeten lezen.
+- `common/templates/bash-script-template.sh` — boilerplate die de check-shell-headers conventie codificeert. Begin-punt voor nieuwe scripts: SPDX + role + uitgebreid header-blok (what/why, writes, idempotency, requires, style-afwijkingen, usage met 3+ voorbeelden, crontab/Docker CMD waar applicable), `set -euo pipefail`, `main()` pattern, helpers-skelet. Eén kopieer-en-aanpassen-actie voor nieuwe scripts.
+- `common/templates/pre-commit-config-shell.yaml.example` — drop-in `.pre-commit-config.yaml` voor shell-heavy repos. Wires: shellcheck (severity=warning), shfmt --check (i=2, ci, bn), gitleaks, jscpd (min-tokens=50, threshold=0), en `check-shell-headers.sh`. Allemaal in --check / gate modus — geen `--write` / `--fix` / auto-rewrite hooks. Hetzelfde "poortwachter, niet auto-correct"-principe als `iso-audit/.pre-commit-config.yaml`.
+
+### Gewijzigd
+- `common/install-pm-cooldown.sh` — SPDX-License-Identifier en `# role: installer` marker toegevoegd in de header, conform de nieuwe `check-shell-headers.sh` conventie. Pre-existing functioneel correct, alleen header-metadata aangevuld zodat de installer zelf conformeert aan de regels die hij meebrengt.
+- `common/templates/README.md` — uitgebreid met de nieuwe shell-script conventie + pre-commit-gates-sectie. Tabel met "what to drop in" bevat nu ook `pre-commit-config-shell.yaml.example` en `bash-script-template.sh`. Verwijst naar `install-shell-tools.sh` als prerequisite.
+
+### Maintainability-noten
+- De `# role:` marker is de centrale haak voor toekomstige policy-checks. Vandaag controleert `check-shell-headers.sh` op aanwezigheid + waarde; later kan dezelfde marker gebruikt worden voor: routing in pre-commit (entrypoint vereist load_env-call, library niet), dependency-graph-rendering (welke entrypoints sourcen welke libraries), of audit-reports voor ISO 27001.
+- Tool-versies (shfmt, gitleaks) zijn pinned in `install-shell-tools.sh` met `readonly` constants. Bump deliberately, document waarom in een CHANGELOG-entry. pre-commit en jscpd zijn niet gepinned op de binary (krijgen per-project pinning via `.pre-commit-config.yaml` / `package.json`).
+
 ## 2026-05-13
 
 ### Toegevoegd

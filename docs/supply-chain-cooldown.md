@@ -4,21 +4,21 @@ Een 7-daagse quarantine op verse pakketversies, voor zowel Node- als Python-ecos
 
 ## Waarom
 
-Het patroon is inmiddels routineus, op beide ecosystemen:
+Het patroon is inmiddels bekend, op beide ecosystemen:
 
 1. Aanvaller compromitteert een maintainer-account (phishing, token-leak, social engineering).
-2. Aanvaller publiceert een nieuwe patch-versie met malicious code (typisch: post-install / install-hook script dat secrets exfiltreert).
+2. Aanvaller publiceert een nieuwe patch-versie met kwaadaardige code (typisch: post-install / install-hook script dat secrets exfiltreert).
 3. Lockfiles met `^x.y.z` / `~x.y.z` constraints, of `pyproject.toml` met `>=x.y.z`, pakken de versie automatisch op tijdens de volgende `npm install` / `pnpm install` / `bun install` / `pip install` / `uv sync`.
-4. Binnen 24-48u (npm) of een paar uur (PyPI) detecteert de registry de versie, yankt of quarantaineert 'm, en publiceert een advisory.
+4. Binnen 24-48u (npm) of een paar uur (PyPI) detecteert de registry de versie, haalt 'm offline of zet 'm in quarantaine, en publiceert een advisory.
 5. Iedereen die in stap 3 de versie installeerde is geraakt; iedereen die na stap 4 installeert niet.
 
 Recente incidenten die door een 7-daagse cooldown waren geblokkeerd:
 
 - **npm — 2026-05-11** — golf van kwaadaardige patch-versies van populaire pakketten, geüpload door gecompromitteerde maintainer-accounts.
-- **PyPI — LiteLLM, maart 2026** — 2 uur 32 minuten live, ruim 119.000 downloads voordat PyPI 'm quarantaineerde. Een 3-daagse cooldown was genoeg geweest.
+- **PyPI — LiteLLM, maart 2026** — 2 uur 32 minuten live, ruim 119.000 downloads voordat PyPI 'm in quarantaine zette. Een 3-daagse cooldown was genoeg geweest.
 - **PyPI — Telnyx, april 2026** — vergelijkbaar patroon, vergelijkbare snelheid van detectie en quarantine.
 
-Een 7-daagse cooldown plaatst je categorisch in groep 2 (na stap 4). Geen pakketversie haalt je lockfile vóór 'ie zeven dagen oud is, dus malicious versies hebben tijd om gedetecteerd en geyankt te worden voordat ze jouw build raken. Het kost je actualiteit (je loopt zeven dagen achter op patches) in ruil voor een drastisch lager supply-chain-risico — een trade-off die voor de meeste workstation- en dev-workflows ruimschoots de moeite waard is.
+Een 7-daagse cooldown plaatst je categorisch in groep 2 (na stap 4). Geen pakketversie haalt je lockfile vóór 'ie zeven dagen oud is, dus kwaadaardige versies hebben tijd om gedetecteerd en geyankt te worden voordat ze jouw build raken. Het kost je actualiteit (je loopt zeven dagen achter op patches) in ruil voor een drastisch lager supply-chain-risico — een trade-off die voor de meeste workstation- en dev-workflows ruimschoots de moeite waard is.
 
 ## Mechanisme per package-manager
 
@@ -114,7 +114,7 @@ Beide overrides zijn opt-in. De default blijft dat een ongelezen `npm install` o
 - **Direct attacks via je IDE / editor extensions** — VSCode-extensies, JetBrains-plugins en Sublime-packages hebben hun eigen update-mechanismen. Daar werkt deze cooldown niet voor.
 - **Browser-extensies, OS-packages, Docker base-images** — andere ecosystems, andere mitigations. Pin Docker images op SHA als je daar zorgen over hebt.
 - **Compromised registry zelf** — de cooldown vertrouwt op een functionerend yank/quarantine-mechanisme. Een aanvaller met registry-control kan in theorie geyankte versies "ondoenken".
-- **Pre-existing malicious versies > N dagen oud** — wat al meer dan 7 dagen circuleert valt buiten de quarantine. De cooldown is een tijds-filter, geen integriteits-check.
+- **Reeds bestaande kwaadaardige versies > N dagen oud** — wat al meer dan 7 dagen circuleert valt buiten de quarantine. De cooldown is een tijds-filter, geen integriteits-check.
 - **Tools zónder cooldown-feature** — `poetry` en `pipenv` (Python) hebben geen native equivalent als van 2026-05; voor die tools is de mitigatie indirect (via pin-files of een wrapper).
 
 Voor het bedreigingsmodel waar deze tool wel/niet voor verdedigt: zie [`threat-model.md`](threat-model.md).

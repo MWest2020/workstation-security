@@ -58,14 +58,14 @@ de hele control ondermijnt (zie `README.md` → WSL Support).
 
 ### Supply-chain attacks via npm / pnpm / bun
 
-**Wat:** Een aanvaller publiceert een malicious versie van een legitiem
+**Wat:** Een aanvaller publiceert een kwaadaardige versie van een legitiem
 pakket (event-stream, ua-parser-js, node-ipc patronen) of een typosquat.
 Die versie wordt geïnstalleerd op een dev-machine en draait
 postinstall-scripts.
 
 **Defense:**
 - 7-daagse cooldown (`install-pm-cooldown.sh`) — refuseert pakketversies
-  jonger dan N dagen. npm yankt malicious uploads doorgaans binnen
+  jonger dan N dagen. npm yankt kwaadaardige uploads doorgaans binnen
   24-48 uur; een 7-daags venster vangt ze vóór ze in lockfiles landen.
 - `~/.claude/CLAUDE.md` rule: `npm ci --ignore-scripts` is de baseline,
   postinstall expliciet aanzetten per package.
@@ -142,7 +142,7 @@ tegen — alleen training en beleid.
 ### Fysieke aanvallen
 
 Een aanvaller met fysieke toegang (gestolen laptop, evil-maid-attack,
-USB-drop met malicious firmware). Disk-encryption is hier de relevante
+USB-drop met kwaadaardige firmware). Disk-encryption is hier de relevante
 control (BitLocker/LUKS), maar workstation-security **installeert geen
 disk-encryption** — alleen de check ervan staat op de
 follow-up-roadmap. Voor laptops in productie: gebruik LUKS of

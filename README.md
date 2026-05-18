@@ -40,7 +40,7 @@ Na installatie:
 
 ### 2. Supply-chain cooldown (npm / pnpm / bun / uv / pip)
 
-**Wat:** 7-daagse quarantine op verse pakketversies voor zowel Node als Python. npm yankt malicious supply-chain versies doorgaans binnen 24-48u; PyPI quarantaineert binnen uren — een cooldown houdt ze buiten je lockfile vóór ze opgemerkt worden.
+**Wat:** 7-daagse quarantine op verse pakketversies voor zowel Node als Python. npm haalt kwaadaardige supply-chain versies doorgaans binnen 24-48u offline; PyPI zet ze binnen uren in quarantaine — een cooldown houdt ze buiten je lockfile vóór ze opgemerkt worden.
 
 **Voor wie:** iedereen die `npm install` / `pnpm install` / `bun install` / `pip install` / `uv sync` op een dev-machine of in CI draait. Vooral relevant als je projecten met veel transitive deps onderhoudt.
 

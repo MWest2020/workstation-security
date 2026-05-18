@@ -32,6 +32,19 @@
   enige bestaande caller (bunfig) is meeverhuisd.
 - README sectie 2 + scope-tabel updaten naar de uitgebreide tool-set.
 
+### Gefixt
+- Taal-correctie in Nederlandstalige docs:
+  - "routineus" (calque van Engels "routine", betekent in NL juist
+    "uit gewoonte / mechanisch", niet "alledaags") → "bekend".
+  - "malicious" → "kwaadaardig" in Nederlandse zinnen.
+  - "quarantaineert" (lelijke verbed-noun) → "zet in quarantaine" /
+    "in quarantaine zetten".
+  Locaties: `docs/threat-model.md`, `docs/compliance.md`,
+  `docs/supply-chain-cooldown.md`, `README.md`. English-quoted
+  framework control-text (SOC 2 CC6.6, CC6.8, CC7.2) blijft als
+  citaat onveranderd; CHANGELOG-entries van v1.0.0 (gedateerd
+  2026-05-18) blijven historisch.
+
 ## v1.0.0 (2026-05-18) — initial public release
 
 OpenSpec change: [`openspec/changes/archive/2026-05-18-v1-release-readiness/`](openspec/changes/archive/2026-05-18-v1-release-readiness/). Bundelde zeven kleine clusters (A2 + C1-C6) tot één coherent v1.0.0-leveringspakket. Gemerged via PR #2; tag plaatste op `d163653` (rebased tip van main na CI groen).

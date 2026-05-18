@@ -52,7 +52,22 @@ rkhunter_init() {
 }
 
 # Enable + start een lijst van clamav-gerelateerde services.
+# Op WSL zonder systemd-opt-in: warn + skip cleanly zodat de OS-installer
+# door kan gaan (packages staan al; daemon-runtime is optioneel — handmatige
+# scans blijven mogelijk). Aansluiting op de gate in install-timers.sh.
 enable_clamav_services() {
+  if ! ws_systemd_available; then
+    if ws_is_wsl; then
+      ws_warn "WSL zonder actieve systemd — ClamAV daemons niet enable'd."
+      ws_info "Daemon-runtime vereist [boot] systemd=true in /etc/wsl.conf + 'wsl --shutdown'."
+    else
+      ws_warn "systemd niet beschikbaar — ClamAV daemons niet enable'd."
+    fi
+    ws_skip "Service enable overgeslagen voor: $*"
+    ws_info "Handmatige scans blijven werken via 'sudo bash common/scan.sh'."
+    return 0
+  fi
+
   local svc
   for svc in "$@"; do
     systemctl enable --now "$svc"

@@ -21,10 +21,21 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
-echo "==> Timers stoppen en uitschakelen..."
-for unit in "${WS_TIMERS[@]}"; do
-  systemctl disable --now "$unit" 2>/dev/null || true
-done
+# Op WSL zonder systemd: timer-disable/daemon-reload werken niet maar de
+# unit files + logrotate config opruimen mag wel. Skip systemd-calls,
+# poets verder gewoon op zodat we geen halve state achterlaten.
+if ws_systemd_available; then
+  echo "==> Timers stoppen en uitschakelen..."
+  for unit in "${WS_TIMERS[@]}"; do
+    systemctl disable --now "$unit" 2>/dev/null || true
+  done
+else
+  if ws_is_wsl; then
+    ws_skip "WSL zonder systemd — timer disable overgeslagen (unit files worden wel verwijderd)."
+  else
+    ws_skip "systemd niet actief — timer disable overgeslagen."
+  fi
+fi
 
 echo "==> Unit files verwijderen..."
 for unit in "${WS_TIMERS[@]}" "${WS_SERVICES_GENERATED[@]}"; do
@@ -34,7 +45,9 @@ done
 echo "==> Logrotate config verwijderen..."
 rm -f /etc/logrotate.d/workstation-security
 
-systemctl daemon-reload
+if ws_systemd_available; then
+  systemctl daemon-reload
+fi
 
 echo ""
 echo "Timers en unit files verwijderd."

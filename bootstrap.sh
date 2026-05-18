@@ -32,7 +32,11 @@ dir="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 dispatch() {
   local sub="$1"
   local installer="$dir/$sub/install.sh"
-  if [[ ! -x "$installer" && ! -f "$installer" ]]; then
+  # Toets alleen op bestaan — de installer wordt via `bash "$installer"`
+  # aangeroepen en hoeft niet executable te zijn. De vorige check
+  # ([[ ! -x && ! -f ]]) was tautologisch: een executable bestand is per
+  # definitie ook een bestand, dus de -x-tak werd nooit hard gemaakt.
+  if [[ ! -f "$installer" ]]; then
     echo "error: installer ontbreekt: $installer" >&2
     exit 2
   fi

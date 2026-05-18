@@ -297,7 +297,11 @@ detect_heuristic() {
     [[ -d "$d" ]] || continue
     while IFS= read -r hit; do
       [[ -n "$hit" ]] && flag_artifact "heuristic" "$hit"
-    done < <(grep -rlE "$HEURISTIC_PATTERN" "$d" 2>/dev/null || true)
+      # -I: skip binary files. Zonder -I stopt grep -rlE bij een corrupt of
+      # binair bestand na de eerste regel met non-zero exit; alle hits in die
+      # find-walk daarna gaan verloren. In een IR-context (silent-miss is
+      # veel erger dan over-flag) is dat de verkeerde failure mode.
+    done < <(grep -rlEI "$HEURISTIC_PATTERN" "$d" 2>/dev/null || true)
   done
 }
 

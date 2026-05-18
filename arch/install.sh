@@ -19,7 +19,11 @@ clamav_ok=0
 rkhunter_ok=0
 
 echo "==> Packages installeren..."
-if pacman -Sy --noconfirm clamav; then
+# -Syu (niet -Sy): partial-upgrade is op Arch een footgun. -Sy ververst alleen
+# de package-database; geïnstalleerde packages blijven hun oude versie houden
+# en verse dependencies matchen niet meer. Arch-community behandelt dit
+# consistent als bug. Met --noconfirm gewoon meteen alles bijwerken.
+if pacman -Syu --noconfirm clamav; then
   clamav_ok=1
 else
   echo "  FOUT: ClamAV installatie mislukt." >&2

@@ -10,8 +10,18 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
+
+# shellcheck source=install-base.sh
+source "${SCRIPT_DIR}/install-base.sh"
+
 echo "==> ClamAV signatures bijwerken..."
-freshclam
+# freshclam_safe stopt eerst clamav-freshclam.service voordat het freshclam
+# zelf draait — anders race't deze update-timer (04:00) tegen de active
+# daemon die de log-lock vasthoudt en faalt de update silently. Audit-
+# relevant: een AV met stale signatures is een non-conformity.
+freshclam_safe
 
 echo "==> rkhunter..."
 if command -v rkhunter &>/dev/null; then

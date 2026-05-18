@@ -61,3 +61,19 @@ ws_fail() { printf '  %s %s\n' "$WS_FAIL" "$*" >&2; }
 ws_warn() { printf '  %s %s\n' "$WS_WARN" "$*" >&2; }
 ws_skip() { printf '  %s %s\n' "$WS_SKIP" "$*"; }
 ws_info() { printf '  %s\n' "$*"; }
+
+# --- runtime detectors (WSL + systemd) ---
+# WSL detecteert via /proc/sys/kernel/osrelease — bevat 'microsoft' (WSL1+2)
+# of 'WSL' (WSL2-kernel-versie-suffix). Beide patterns gevangen.
+ws_is_wsl() {
+  grep -qiE 'microsoft|wsl' /proc/sys/kernel/osrelease 2>/dev/null
+}
+
+# Heeft systemd als init? Twee checks:
+#   1. /run/systemd/system bestaat (alleen wanneer systemd booted heeft)
+#   2. PID 1 is systemd (vs. wsl-init, sysvinit, etc.)
+# WSL1: geen systemd. WSL2 standaard: geen systemd. WSL2 met
+# /etc/wsl.conf [boot] systemd=true (+ wsl --shutdown): wél systemd.
+ws_systemd_available() {
+  [[ -d /run/systemd/system ]] && [[ "$(ps -p 1 -o comm= 2>/dev/null)" == "systemd" ]]
+}

@@ -19,6 +19,30 @@ readonly UNIT_DIR="/etc/systemd/system"
 # shellcheck source=/dev/null
 source "${SCRIPT_DIR}/lib.sh"
 
+# --- WSL / systemd gate ---
+# install-timers vereist systemd. WSL1 heeft het niet; WSL2 alleen na opt-in
+# via /etc/wsl.conf ([boot] systemd=true) + 'wsl --shutdown'. Zonder systemd
+# kunnen we de timers niet enable'n — warn + exit cleanly zodat de
+# bootstrap-flow niet faalt op iets dat handmatig op te lossen is.
+if ! ws_systemd_available; then
+  if ws_is_wsl; then
+    ws_warn "WSL gedetecteerd zonder actieve systemd-runtime."
+    ws_info "Om timers te activeren:"
+    ws_info "  1. Zet in /etc/wsl.conf:  [boot]\\n     systemd=true"
+    ws_info "  2. Vanuit Windows:        wsl --shutdown"
+    ws_info "  3. Open WSL opnieuw en draai deze installer nogmaals."
+  else
+    ws_warn "systemd niet beschikbaar als init — timers worden niet geïnstalleerd."
+    ws_info "Dit script vereist een systemd-gebaseerde Linux distributie."
+  fi
+  ws_skip "Timer/logrotate installatie overgeslagen."
+  ws_info "AV-tooling (clamav, rkhunter) blijft handmatig draaibaar:"
+  ws_info "  sudo bash common/update.sh    # signatures bijwerken"
+  ws_info "  sudo bash common/scan.sh      # ClamAV scan"
+  ws_info "  sudo rkhunter --check         # rootkit check"
+  exit 0
+fi
+
 # --- Dagelijkse signature/database update ---
 
 cat >"$UNIT_DIR/av-update.service" <<UNIT

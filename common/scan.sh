@@ -12,7 +12,21 @@
 #   # Doorgaans aangeroepen door ws-scan.timer (dagelijks)
 set -uo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
+
+# shellcheck source=lib.sh
+source "${SCRIPT_DIR}/lib.sh"
+
 LOG="/var/log/clamav/daily-scan.log"
+
+# WSL: sluit /mnt uit (Windows-drives via DrvFs). Native Linux: /mnt is
+# vaak een legitieme mount voor tijdelijke media — daar wél scannen.
+# Bouw exclude-args dynamisch op zodat de clamscan-call portable blijft.
+extra_excludes=()
+if ws_is_wsl; then
+  extra_excludes+=(--exclude-dir='^/mnt/')
+fi
 
 clamscan -r /home \
   --infected \
@@ -27,7 +41,8 @@ clamscan -r /home \
   --exclude-dir='\.venv' \
   --exclude-dir='\.local/share/Steam' \
   --exclude-dir='node_modules' \
-  --exclude-dir='__pycache__'
+  --exclude-dir='__pycache__' \
+  "${extra_excludes[@]}"
 rc=$?
 
 if [[ $rc -eq 1 ]]; then

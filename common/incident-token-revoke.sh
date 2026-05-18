@@ -84,6 +84,30 @@ case "$(uname -s)" in
     ;;
 esac
 
+# WSL scope-limit waarschuwing.
+# Een aanvaller die persistence wil op een WSL-workstation kan dit óók via
+# Windows-Task-Scheduler, een Windows-service, of een autorun in HKCU doen.
+# Die mechanismen liggen buiten WSL — uname/ps/systemctl-detectie van dit
+# script ziet ze niet. Tegelijk schrijft dit script gewoon door op de
+# Linux-paden (~/.local/bin, ~/.config/systemd/user, etc.) — die zijn wel
+# in scope. Print één duidelijke waarschuwing bij start zodat de operator
+# weet dat Windows-kant óók geaudit moet worden, en doe verder gewoon.
+# Inline detectie (geen lib.sh dependency) — IR-script blijft self-contained.
+if [[ "$OS" == "linux" ]] && grep -qiE 'microsoft|wsl' /proc/sys/kernel/osrelease 2>/dev/null; then
+  cat >&2 <<'WSL_WARN'
+
+! WSL gedetecteerd — scope-limit:
+  Dit script scant alleen de WSL-Linux-kant (~/.local/bin, systemd-user,
+  ~/.config/autostart, ~/.bashrc.d). Persistence-mechanismen op de
+  WINDOWS-host (Task Scheduler, services, HKCU Run-keys, startup-folder)
+  worden NIET gedetecteerd door dit script. Controleer ook handmatig:
+    - Windows: Get-ScheduledTask | Where-Object {$_.TaskPath -match 'gh|github'}
+    - Windows: reg query 'HKCU\Software\Microsoft\Windows\CurrentVersion\Run'
+    - Windows: %APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\
+
+WSL_WARN
+fi
+
 # ---------- argumenten ----------
 
 DRY_RUN=0

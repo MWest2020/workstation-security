@@ -35,6 +35,9 @@ OS-installer draait.
 - Target distros: Alma / Rocky / RHEL / Fedora / CentOS (dnf), Arch /
   Manjaro / EndeavourOS (pacman), Ubuntu / Debian / Mint / Pop / Raspbian
   (apt). macOS wordt deels ondersteund — het IR-script werkt cross-platform.
+- WSL2 (Windows Subsystem for Linux) is detecteerbaar en wordt netjes
+  afgehandeld — scripts skippen systemd-features waar nodig in plaats van
+  hard te falen. Zie [WSL Support](#wsl-support) onderaan.
 
 ## Gebruik
 
@@ -191,6 +194,61 @@ Zie `common/templates/README.md` voor de volledige uitleg.
 ```bash
 sudo bash common/update.sh
 ```
+
+## WSL Support
+
+De installer + checks zijn WSL-aware. Een WSL2-Ubuntu draait de gewone
+`bootstrap.sh` → `ubuntu/install.sh`-flow; WSL2-Alma idem voor `alma/`.
+Wat afwijkt op WSL:
+
+| Component | Native Linux | WSL zonder systemd | WSL met systemd-opt-in |
+|---|---|---|---|
+| Package install (clamav, rkhunter) | ✓ | ✓ | ✓ |
+| `install-pm-cooldown.sh` (user-level config) | ✓ | ✓ | ✓ |
+| `install-shell-tools.sh` + pre-commit gates | ✓ | ✓ | ✓ |
+| systemd timers (auto-scans) | ✓ | skipped + warning | ✓ |
+| `check.sh` services/timers sectie | ✓ | skipped + WSL-uitleg | ✓ |
+| `scan.sh` excludes `/mnt/*` (Windows drives) | n/a | auto | auto |
+| `incident-token-revoke.sh` | ✓ Linux-side | ✓ Linux-side + Windows-warning | ✓ Linux-side + Windows-warning |
+
+### WSL2 + systemd inschakelen (aanbevolen)
+
+Zonder systemd kunnen de dagelijkse timers niet draaien. Eenmalige setup:
+
+```bash
+# In WSL2:
+sudo tee /etc/wsl.conf >/dev/null <<'EOF'
+[boot]
+systemd=true
+EOF
+
+# Vervolgens vanuit Windows PowerShell:
+wsl --shutdown
+# Open WSL opnieuw — controleer met:
+ps -p 1 -o comm=    # moet 'systemd' zijn
+```
+
+Daarna draait `sudo bash bootstrap.sh` als op native Linux.
+
+### WSL1 of WSL2 zonder systemd
+
+Alles werkt behalve de timers. Voor automatische scans heb je twee opties:
+
+1. **Migreer naar WSL2 met systemd** (zie boven) — aanbevolen.
+2. **Handmatig draaien** wanneer je toch al in WSL zit:
+   ```bash
+   sudo bash common/update.sh    # wekelijks bv. via een cron alias
+   sudo bash common/scan.sh
+   sudo rkhunter --check
+   ```
+
+### Incident response op WSL — scope-limit
+
+`incident-token-revoke.sh` detecteert WSL en print bij start een
+waarschuwing dat **persistence op de Windows-host** (Task Scheduler, HKCU
+Run-keys, startup folder) niet door dit script wordt gezien. Voor een
+volledige IR op WSL controleer je óók Windows-kant — het script print de
+exacte PowerShell + reg-commands die je daar moet draaien.
 
 ## Verwijderen
 

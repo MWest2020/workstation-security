@@ -23,40 +23,54 @@ echo ""
 echo "=== workstation-security status ==="
 echo ""
 
-echo "Services:"
+# Systemd-afhankelijke secties (services + timers). Op WSL zonder
+# systemd-opt-in zijn deze niet relevant — sla ze over met duidelijke uitleg
+# zodat een gebruiker niet denkt dat er iets stuk is.
+if ws_systemd_available; then
+  echo "Services:"
 
-# Eén `systemctl list-units` call, output gecapture'd in een var. Daarna
-# matchen we per candidate via here-string — geen pipe, dus geen SIGPIPE-
-# risico op `grep -q` (die early-exit'et bij een hit en upstream een SIGPIPE
-# zou geven dat door `pipefail` als pipeline-failure binnenkomt — false skip).
-units_output="$(systemctl list-units --full --all 2>/dev/null)"
+  # Eén `systemctl list-units` call, output gecapture'd in een var. Daarna
+  # matchen we per candidate via here-string — geen pipe, dus geen SIGPIPE-
+  # risico op `grep -q` (die early-exit'et bij een hit en upstream een SIGPIPE
+  # zou geven dat door `pipefail` als pipeline-failure binnenkomt — false skip).
+  units_output="$(systemctl list-units --full --all 2>/dev/null)"
 
-# Detecteer welke ClamAV-service-naam actief is (Alma vs Arch vs Ubuntu).
-for svc in "${WS_CLAMAV_DAEMON_CANDIDATES[@]}"; do
-  if ! grep -qE "^${svc}\b|^  ${svc}" <<<"$units_output"; then
-    continue
-  fi
-  status="$(systemctl is-active "$svc" 2>/dev/null || echo "inactive")"
-  if [[ "$status" == "active" ]]; then
-    ws_ok "$svc"
+  # Detecteer welke ClamAV-service-naam actief is (Alma vs Arch vs Ubuntu).
+  for svc in "${WS_CLAMAV_DAEMON_CANDIDATES[@]}"; do
+    if ! grep -qE "^${svc}\b|^  ${svc}" <<<"$units_output"; then
+      continue
+    fi
+    status="$(systemctl is-active "$svc" 2>/dev/null || echo "inactive")"
+    if [[ "$status" == "active" ]]; then
+      ws_ok "$svc"
+    else
+      ws_fail "$svc (inactive)"
+      ((errors++)) || true
+    fi
+  done
+
+  echo ""
+  echo "Timers:"
+
+  for timer in "${WS_TIMERS[@]}"; do
+    status="$(systemctl is-active "$timer" 2>/dev/null || echo "inactive")"
+    if [[ "$status" == "active" ]]; then
+      ws_ok "$timer"
+    else
+      ws_fail "$timer (inactive)"
+      ((errors++)) || true
+    fi
+  done
+else
+  echo "Services / Timers:"
+  if ws_is_wsl; then
+    ws_skip "WSL zonder systemd — services/timers niet van toepassing"
+    ws_info "Voor automatische scans op WSL: zet [boot] systemd=true in /etc/wsl.conf"
+    ws_info "en draai 'wsl --shutdown' (vanuit Windows), dan installer opnieuw."
   else
-    ws_fail "$svc (inactive)"
-    ((errors++)) || true
+    ws_skip "systemd niet beschikbaar — services/timers niet gecheckt"
   fi
-done
-
-echo ""
-echo "Timers:"
-
-for timer in "${WS_TIMERS[@]}"; do
-  status="$(systemctl is-active "$timer" 2>/dev/null || echo "inactive")"
-  if [[ "$status" == "active" ]]; then
-    ws_ok "$timer"
-  else
-    ws_fail "$timer (inactive)"
-    ((errors++)) || true
-  fi
-done
+fi
 
 echo ""
 echo "Signatures:"

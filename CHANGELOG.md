@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-05-18 (later)
+
+### Toegevoegd
+- WSL-aware runtime — alle scripts detecteren WSL en passen gedrag aan in plaats van hard te falen op ontbrekende systemd. Native alma/arch/ubuntu blijft identiek werken; WSL2-installaties van diezelfde distros draaien dezelfde installer-paden en krijgen waar nodig duidelijke skip-messages plus opt-in-instructies voor `[boot] systemd=true`. Geen aparte "wsl/" subdir — één codebase, drie distros × twee runtimes (native + WSL).
+- `ws_is_wsl()` en `ws_systemd_available()` helpers in `common/lib.sh` — detectie via `/proc/sys/kernel/osrelease` (vangt zowel WSL1 als WSL2 kernel-suffix) en `ps -p 1 -o comm=` (vangt WSL2-zonder-opt-in waar `/run/systemd/system` bestaat maar PID 1 geen systemd is).
+- `README.md` — nieuwe "WSL Support" sectie met compatibility-matrix (welke componenten werken native vs WSL-zonder-systemd vs WSL-met-systemd-opt-in), opt-in-instructies (`/etc/wsl.conf` + `wsl --shutdown`), en de IR-scope-limit waarschuwing.
+
+### Gewijzigd
+- `common/install-timers.sh` — WSL-guard bovenaan: als `ws_systemd_available` false is, warn + skip + clean exit 0. Op WSL gespecialiseerde uitleg met de drie-stappen opt-in. Op native Linux zonder systemd: generieke warning. Vervangt het oude scenario waar `systemctl daemon-reload` faalt met cryptische error.
+- `check.sh` — systemd-afhankelijke secties (Services + Timers) gewrapped in `ws_systemd_available`-check. Op WSL zonder systemd: één geconsolideerde skip-message met opt-in-instructie, geen false-positive failures. Signature/log-checks blijven gewoon draaien (niet systemd-afhankelijk).
+- `common/scan.sh` — sourcet nu `lib.sh` en voegt `--exclude-dir='^/mnt/'` toe wanneer `ws_is_wsl` true is. Voorkomt uren-durende scans van Windows-drives via DrvFs. Native Linux: `/mnt` wordt NIET uitgesloten (vaak legitiem mountpoint voor tijdelijke media).
+- `common/incident-token-revoke.sh` — print bij start van een Linux-run een scope-limit waarschuwing als WSL gedetecteerd is. Persistence-mechanismen op de Windows-host (Task Scheduler, HKCU Run-keys, startup folder) zijn buiten WSL's bereik en dus buiten dit script — operator krijgt expliciete PowerShell + reg-commands om Windows-kant óók te auditen. Inline WSL-detectie (geen lib.sh dependency) want het IR-script blijft self-contained voor emergency-runs.
+
+### Maintainability-noten
+- `ws_systemd_available` is een tweevoudige check (`/run/systemd/system`-dir + `ps -p 1 -o comm=`). De directory-only check zou false-positive geven op WSL2 zonder `[boot] systemd=true` als een ander proces ooit /run/systemd/system heeft aangemaakt. De PID-1-check is de definitieve.
+- WSL-detectie via `/proc/sys/kernel/osrelease` is robust voor beide WSL-generaties. Microsoft heeft de string ge-rebrand van "Microsoft" (WSL1) naar "microsoft-standard-WSL2" (WSL2) — case-insensitive grep op `microsoft|wsl` vangt beide.
+- Toevoegen van een nieuwe WSL-quirk: ws_is_wsl is de centrale gate. Voor distro-specifieke quirks blijven `alma/install.sh` / `arch/install.sh` / `ubuntu/install.sh` de plek; voor runtime-specifieke quirks komt logic in de gedeelde scripts onder een `ws_is_wsl`-check.
+
 ## 2026-05-18
 
 ### Toegevoegd

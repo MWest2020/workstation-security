@@ -1,5 +1,37 @@
 # Changelog
 
+## Unreleased — Python support in `install-pm-cooldown.sh` (uv + pip)
+
+### Toegevoegd
+- `install-pm-cooldown.sh` schrijft nu óók user-level config voor uv
+  (`~/.config/uv/uv.toml` met `exclude-newer = "N days"`) en pip
+  (`~/.config/pip/pip.conf` met `[install] uploaded-prior-to = PND`).
+  Hetzelfde idempotente upsert-mechanisme als voor npm/pnpm/bun;
+  bestaande inhoud van die files (andere `[tool.uv]` settings, andere
+  pip-flags, etc.) blijft staan. `--check` en `--dry-run` tonen ook de
+  Python-keys.
+- `common/templates/pyproject-uv-snippet.toml.example` — snippet om
+  in een bestaande `pyproject.toml` te mergen (`[tool.uv].exclude-newer`).
+- `common/templates/project-pip.conf.example` — per-project pip.conf
+  voor projecten die `PIP_CONFIG_FILE=$PWD/pip.conf` in CI zetten.
+  Pip auto-detect't `pip.conf` niet zoals npm `.npmrc`, dus zonder
+  env-var-hop heeft het file-template geen effect.
+- `docs/supply-chain-cooldown.md` herschreven naar npm/pnpm/bun/uv/pip
+  coverage. Nieuwe incidenten: LiteLLM (maart 2026, 119k+ downloads in
+  2u32min) en Telnyx (april 2026). Externe primaire bronnen genoemd
+  (PyPI security blog, uv docs, pip docs, cooldowns.dev).
+- `common/templates/README.md` uitgebreid met Python-templates +
+  `UV_EXCLUDE_NEWER` / `PIP_UPLOADED_PRIOR_TO` env-vars voor CI-only
+  configuraties.
+
+### Gewijzigd
+- `upsert_bunfig()` in `install-pm-cooldown.sh` hernoemd naar
+  `upsert_section_kv()` en geparametriseerd (section + key + value).
+  Werkt nu voor zowel `bunfig.toml [install] minimumReleaseAge` als
+  `pip.conf [install] uploaded-prior-to`. Backward compatible — de
+  enige bestaande caller (bunfig) is meeverhuisd.
+- README sectie 2 + scope-tabel updaten naar de uitgebreide tool-set.
+
 ## v1.0.0 (2026-05-18) — initial public release
 
 OpenSpec change: [`openspec/changes/archive/2026-05-18-v1-release-readiness/`](openspec/changes/archive/2026-05-18-v1-release-readiness/). Bundelde zeven kleine clusters (A2 + C1-C6) tot één coherent v1.0.0-leveringspakket. Gemerged via PR #2; tag plaatste op `d163653` (rebased tip van main na CI groen).

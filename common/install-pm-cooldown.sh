@@ -7,15 +7,18 @@
 # nog steeds 3.2 uit 2007 is (Apple update niet i.v.m. GPLv3). Met `env`
 # wordt de homebrew bash 5.x gevonden. Rest van de baseline volgt Google.
 #
-# common/install-pm-cooldown.sh — installeer 7-daagse cooldown voor npm, pnpm
-# en bun. Refuseert pakketversies gepubliceerd in de afgelopen N dagen — npm
-# yankt malicious versies doorgaans binnen 24-48u, dus een 7-daagse quarantine
-# vangt supply-chain attacks vóór ze jouw lockfile raken.
+# common/install-pm-cooldown.sh — installeer N-daagse cooldown voor npm, pnpm,
+# bun, uv en pip. Refuseert pakketversies gepubliceerd in de afgelopen N dagen
+# — registers yanken malicious versies doorgaans binnen 24-48u (npm) of een
+# paar uur (PyPI), dus een 7-daagse quarantine vangt supply-chain attacks vóór
+# ze jouw lockfile raken.
 #
 # Schrijft user-level config (geen sudo nodig):
-#   ~/.npmrc        min-release-age=N            (npm 11.10+)
-#                   minimum-release-age=N*1440   (pnpm 10.16+, in minuten)
-#   ~/.bunfig.toml  [install] minimumReleaseAge=N*86400  (bun 1.3+, in seconden)
+#   ~/.npmrc                    min-release-age=N            (npm 11.10+)
+#                               minimum-release-age=N*1440   (pnpm 10.16+, in minuten)
+#   ~/.bunfig.toml              [install] minimumReleaseAge=N*86400  (bun 1.3+, in seconden)
+#   ~/.config/uv/uv.toml        exclude-newer="N days"       (uv 0.9.17+)
+#   ~/.config/pip/pip.conf      [install] uploaded-prior-to=PND  (pip 26.1+)
 #
 # Idempotent: re-run upsert de keys, dupliceert nooit. Bestaande auth tokens,
 # registries en custom keys blijven staan. Bestandsmode wordt behouden
@@ -38,6 +41,8 @@ source "${SCRIPT_DIR}/lib.sh"
 
 readonly NPMRC="${HOME}/.npmrc"
 readonly BUNFIG="${HOME}/.bunfig.toml"
+readonly UVTOML="${HOME}/.config/uv/uv.toml"
+readonly PIPCONF="${HOME}/.config/pip/pip.conf"
 
 days=7
 mode="install"
@@ -133,48 +138,50 @@ upsert_kv() {
   rm -f "$tmp"
 }
 
-# Idempotente upsert van `minimumReleaseAge` binnen [install]-sectie in TOML.
-# Maakt [install] aan als die ontbreekt.
-upsert_bunfig() {
-  local file="$1" age="$2"
+# Idempotente upsert van `key = value` binnen een named section in een
+# TOML/INI-achtig bestand. Maakt de section aan als die ontbreekt.
+# Werkt zowel voor bunfig.toml ([install] minimumReleaseAge = N) als voor
+# pip.conf ([install] uploaded-prior-to = PND).
+upsert_section_kv() {
+  local file="$1" section="$2" key="$3" value="$4"
   local tmp
   tmp="$(mktemp)"
   if [[ -f "$file" ]]; then
-    awk -v age="$age" '
-      BEGIN { in_install = 0; written = 0 }
-      /^[[:space:]]*\[install\][[:space:]]*$/ {
-        print; in_install = 1; next
+    awk -v section="$section" -v k="$key" -v v="$value" '
+      BEGIN { in_section = 0; written = 0 }
+      $0 ~ "^[[:space:]]*\\[" section "\\][[:space:]]*$" {
+        print; in_section = 1; next
       }
       /^[[:space:]]*\[/ {
-        if (in_install && !written) {
-          print "minimumReleaseAge = " age
+        if (in_section && !written) {
+          print k " = " v
           written = 1
         }
-        in_install = 0
+        in_section = 0
         print; next
       }
-      in_install && /^[[:space:]]*minimumReleaseAge[[:space:]]*=/ {
-        print "minimumReleaseAge = " age
+      in_section && $0 ~ "^[[:space:]]*" k "[[:space:]]*=" {
+        print k " = " v
         written = 1
         next
       }
       { print }
       END {
         if (!written) {
-          if (in_install) {
-            print "minimumReleaseAge = " age
+          if (in_section) {
+            print k " = " v
           } else {
             print ""
-            print "[install]"
-            print "minimumReleaseAge = " age
+            print "[" section "]"
+            print k " = " v
           }
         }
       }
     ' "$file" >"$tmp"
   else
     {
-      printf '[install]\n'
-      printf 'minimumReleaseAge = %s\n' "$age"
+      printf '[%s]\n' "$section"
+      printf '%s = %s\n' "$key" "$value"
     } >"$tmp"
   fi
   write_preserving_mode "$file" "$tmp"
@@ -203,6 +210,8 @@ check_only() {
   show_kv "$NPMRC" "min-release-age"
   show_kv "$NPMRC" "minimum-release-age"
   show_kv "$BUNFIG" "minimumReleaseAge"
+  show_kv "$UVTOML" "exclude-newer"
+  show_kv "$PIPCONF" "uploaded-prior-to"
 }
 
 main() {
@@ -216,12 +225,16 @@ main() {
   local npm_days="$days"
   local pnpm_minutes=$((days * 24 * 60))
   local bun_seconds=$((days * 24 * 60 * 60))
+  local python_iso="P${days}D"      # ISO 8601 duration — pip uploaded-prior-to
+  local uv_friendly="${days} days"  # friendly relative duration — uv exclude-newer
 
   if ws_is_dry_run; then
     echo "Would install ${days}-day package-manager cooldown:"
     echo "  ${NPMRC}: would upsert min-release-age=${npm_days} (npm)"
     echo "  ${NPMRC}: would upsert minimum-release-age=${pnpm_minutes} (pnpm, minuten)"
     echo "  ${BUNFIG}: would upsert [install] minimumReleaseAge=${bun_seconds} (bun, seconden)"
+    echo "  ${UVTOML}: would upsert exclude-newer=\"${uv_friendly}\" (uv)"
+    echo "  ${PIPCONF}: would upsert [install] uploaded-prior-to=${python_iso} (pip)"
     echo ""
     echo "Huidige staat ter referentie:"
     check_only
@@ -236,15 +249,27 @@ main() {
   upsert_kv "$NPMRC" "minimum-release-age" "$pnpm_minutes"
   echo "  ${NPMRC} : min-release-age=${npm_days} (npm), minimum-release-age=${pnpm_minutes} (pnpm)"
 
-  upsert_bunfig "$BUNFIG" "$bun_seconds"
+  upsert_section_kv "$BUNFIG" "install" "minimumReleaseAge" "$bun_seconds"
   echo "  ${BUNFIG} : [install] minimumReleaseAge=${bun_seconds} (bun)"
+
+  # uv.toml leeft onder XDG_CONFIG_HOME; maak de dir aan als die nog niet bestaat.
+  mkdir -p "$(dirname "$UVTOML")"
+  upsert_kv "$UVTOML" "exclude-newer" "\"${uv_friendly}\""
+  echo "  ${UVTOML} : exclude-newer=\"${uv_friendly}\" (uv)"
+
+  # pip.conf leeft onder XDG_CONFIG_HOME; idem.
+  mkdir -p "$(dirname "$PIPCONF")"
+  upsert_section_kv "$PIPCONF" "install" "uploaded-prior-to" "$python_iso"
+  echo "  ${PIPCONF} : [install] uploaded-prior-to=${python_iso} (pip)"
 
   cat <<'EOF'
 
-Klaar. Cooldown is nu actief voor nieuwe installs.
+Klaar. Cooldown is nu actief voor nieuwe installs (npm / pnpm / bun / uv / pip).
 
 Per-install override (alleen als je écht weet wat je doet — bv. urgent CVE-fix):
-  - Zet in project-lokale .npmrc / bunfig.toml de waarde op 0
+  - Node-ecosysteem: zet in project-lokale .npmrc / bunfig.toml de waarde op 0
+  - Python: pip install --uploaded-prior-to <past-date> ...
+            uv add --exclude-newer 'never' ...   (of pin op een datum vóór nu)
   - Raadpleeg de docs van je pkg-manager voor command-line overrides
 
 Verificatie:

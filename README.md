@@ -38,11 +38,11 @@ Na installatie:
 | `clamav-scan.timer`      | Dagelijks 02:00 | Volledige scan van `/home`      |
 | `rkhunter-check.timer`   | Dagelijks 03:00 | Rootkit check                   |
 
-### 2. Supply-chain cooldown (npm / pnpm / bun)
+### 2. Supply-chain cooldown (npm / pnpm / bun / uv / pip)
 
-**Wat:** 7-daagse quarantine op verse pakketversies. npm yankt malicious supply-chain versies doorgaans binnen 24-48u — een cooldown houdt ze buiten je lockfile vóór ze opgemerkt worden.
+**Wat:** 7-daagse quarantine op verse pakketversies voor zowel Node als Python. npm yankt malicious supply-chain versies doorgaans binnen 24-48u; PyPI quarantaineert binnen uren — een cooldown houdt ze buiten je lockfile vóór ze opgemerkt worden.
 
-**Voor wie:** iedereen die `npm install` / `pnpm install` / `bun install` op een dev-machine of in CI draait. Vooral relevant als je projecten met veel transitive deps onderhoudt.
+**Voor wie:** iedereen die `npm install` / `pnpm install` / `bun install` / `pip install` / `uv sync` op een dev-machine of in CI draait. Vooral relevant als je projecten met veel transitive deps onderhoudt.
 
 **Snelle start:**
 ```bash
@@ -52,7 +52,7 @@ bash common/install-pm-cooldown.sh --check     # huidige state tonen
 bash common/install-pm-cooldown.sh --dry-run   # wat het zou doen, geen wijzigingen
 ```
 
-User-level (`~/.npmrc` + `~/.bunfig.toml`). Voor CI / per-project / override-flow zie [`docs/supply-chain-cooldown.md`](docs/supply-chain-cooldown.md).
+User-level (`~/.npmrc`, `~/.bunfig.toml`, `~/.config/uv/uv.toml`, `~/.config/pip/pip.conf`). Voor CI / per-project / override-flow zie [`docs/supply-chain-cooldown.md`](docs/supply-chain-cooldown.md).
 
 ### 3. Incident response — GitHub-token compromise
 

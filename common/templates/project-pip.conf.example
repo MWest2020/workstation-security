@@ -1,0 +1,22 @@
+# Project-level pip.conf — drop in repo root.
+#
+# Unlike npm with .npmrc, pip does NOT auto-discover a project-level pip.conf.
+# To use this file, point pip at it via env-var in your CI workflow:
+#
+#   env:
+#     PIP_CONFIG_FILE: ${{ github.workspace }}/pip.conf
+#
+# Or, simpler, set the env-var directly in CI:
+#
+#   env:
+#     PIP_UPLOADED_PRIOR_TO: P7D
+#
+# See common/templates/README.md for the full CI matrix.
+#
+# Safe to commit. No secrets here.
+
+[install]
+# Reject package versions younger than 7 days. ISO 8601 duration syntax (P<N>D).
+# Requires pip 26.1+. Older pip silently ignores this (no protection but
+# also no harm — older pip won't fail on the unknown option).
+uploaded-prior-to = P7D

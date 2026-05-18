@@ -25,6 +25,11 @@ if [[ -n "${WS_LIB_SOURCED:-}" ]]; then
 fi
 readonly WS_LIB_SOURCED=1
 
+# Pad naar deze library — gebruikt door ws_version() om VERSION te lokaliseren
+# relatief aan de repo-root, ongeacht waar de caller vandaan source't.
+WS_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly WS_LIB_DIR
+
 # --- status-iconen (repo-breed) ---
 readonly WS_PASS="✓"
 readonly WS_FAIL="✗"
@@ -62,11 +67,60 @@ ws_warn() { printf '  %s %s\n' "$WS_WARN" "$*" >&2; }
 ws_skip() { printf '  %s %s\n' "$WS_SKIP" "$*"; }
 ws_info() { printf '  %s\n' "$*"; }
 
+# --- dry-run ---
+# Eén bron van waarheid voor dry-run-modus. Installers checken via
+# ws_is_dry_run(); arg-parsing zet `WS_DRY_RUN=1` (en export't 'm) zodat de flag
+# automatisch propageert naar sub-installers (zie design.md D2). Default 0.
+ws_is_dry_run() {
+  [[ "${WS_DRY_RUN:-0}" == "1" ]]
+}
+
+# ws_run_or_print: voer een commando uit, of print het in dry-run-modus zonder
+# side effects. Werkt voor simpele exec-vorm (geen pipes/redirects); voor
+# heredocs en redirects moet de caller zelf branchen op ws_is_dry_run.
+# Output-prefix "  would run: " is consistent over installers heen voor copy-paste.
+ws_run_or_print() {
+  if ws_is_dry_run; then
+    printf '  would run: %s\n' "$*"
+    return 0
+  fi
+  "$@"
+}
+
 # --- runtime detectors (WSL + systemd) ---
 # WSL detecteert via /proc/sys/kernel/osrelease — bevat 'microsoft' (WSL1+2)
 # of 'WSL' (WSL2-kernel-versie-suffix). Beide patterns gevangen.
 ws_is_wsl() {
   grep -qiE 'microsoft|wsl' /proc/sys/kernel/osrelease 2>/dev/null
+}
+
+# --- versioning ---
+# ws_version: print de inhoud van top-level VERSION-file (zonder trailing
+# newline issue dankzij command-substitution-stripping in callers). Fallback
+# 'unknown' wanneer de file ontbreekt of niet leesbaar is — zodat een script
+# dat los gedownload werd niet faalt op een ontbrekend VERSION-bestand.
+ws_version() {
+  local version_file="${WS_LIB_DIR}/../VERSION"
+  if [[ -r "$version_file" ]]; then
+    cat "$version_file"
+  else
+    echo "unknown"
+  fi
+}
+
+# ws_handle_version: scan "$@" voor --version of -V en exit 0 met een
+# version-string als die aanwezig zijn. Aanroepen vóór andere arg-parsing zodat
+# --version altijd voorrang heeft (ook gecombineerd met andere flags).
+ws_handle_version() {
+  local arg
+  for arg in "$@"; do
+    case "$arg" in
+      --version | -V)
+        echo "workstation-security $(ws_version)"
+        exit 0
+        ;;
+    esac
+  done
 }
 
 # Heeft systemd als init? Twee checks:

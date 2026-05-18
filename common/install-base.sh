@@ -28,8 +28,13 @@ readonly WS_BASE_DIR
 source "${WS_BASE_DIR}/lib.sh"
 
 # Vereist root; toont begeleidende sudo-hint met het pad van de caller.
+# Dry-run: skip de check — een gebruiker wil ook zonder sudo kunnen voorspellen
+# wat de installer zou doen (CI / audit-evidence).
 require_root() {
   local caller_hint="${1:-install.sh}"
+  if ws_is_dry_run; then
+    return 0
+  fi
   if [[ $EUID -ne 0 ]]; then
     echo "Run als root: sudo bash ${caller_hint}" >&2
     exit 1
@@ -39,6 +44,11 @@ require_root() {
 # freshclam draait niet als de daemon de log-lock vasthoudt — stop hem eerst.
 # Best-effort: faalt zonder error als de service niet bestaat.
 freshclam_safe() {
+  if ws_is_dry_run; then
+    ws_run_or_print systemctl stop clamav-freshclam
+    ws_run_or_print freshclam
+    return 0
+  fi
   systemctl stop clamav-freshclam 2>/dev/null || true
   freshclam
 }
@@ -47,8 +57,8 @@ freshclam_safe() {
 # distro-specifieke quirk een set +e/-e-wrapper nodig heeft (Arch ships een
 # rkhunter die op deprecated egrep een non-zero terugkomt — zie arch/install.sh).
 rkhunter_init() {
-  rkhunter --update
-  rkhunter --propupd
+  ws_run_or_print rkhunter --update
+  ws_run_or_print rkhunter --propupd
 }
 
 # Enable + start een lijst van clamav-gerelateerde services.
@@ -56,6 +66,13 @@ rkhunter_init() {
 # door kan gaan (packages staan al; daemon-runtime is optioneel — handmatige
 # scans blijven mogelijk). Aansluiting op de gate in install-timers.sh.
 enable_clamav_services() {
+  if ws_is_dry_run; then
+    local svc
+    for svc in "$@"; do
+      printf '  would run: systemctl enable --now %s\n' "$svc"
+    done
+    return 0
+  fi
   if ! ws_systemd_available; then
     if ws_is_wsl; then
       ws_warn "WSL zonder actieve systemd — ClamAV daemons niet enable'd."

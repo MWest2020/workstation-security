@@ -15,9 +15,10 @@ incident-token-revoke.env
 *_rsa
 *.crt
 
-# IDE
+# IDE / AI-tooling
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 *~

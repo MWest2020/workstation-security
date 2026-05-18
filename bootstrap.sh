@@ -8,11 +8,38 @@
 # Style-afwijking: shebang via `env bash` voor consistentie met repo.
 #
 # Usage:
-#   sudo bash bootstrap.sh    # detecteert OS en dispatcht naar alma/arch/ubuntu install.sh
+#   sudo bash bootstrap.sh             # detecteert OS en dispatcht naar alma/arch/ubuntu install.sh
+#   bash bootstrap.sh --dry-run        # toon welke sub-installer aangeroepen zou worden, geen wijzigingen
+#   bash bootstrap.sh --version        # print versie en exit
 
 set -euo pipefail
 
-if [[ $EUID -ne 0 ]]; then
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+readonly SCRIPT_DIR
+
+# shellcheck source=common/lib.sh
+source "${SCRIPT_DIR}/common/lib.sh"
+
+# --version vóór de root-check zodat een gebruiker zonder sudo de versie kan
+# opvragen. ws_handle_version exit 0 als de flag aanwezig is.
+ws_handle_version "$@"
+
+# --dry-run parsing — accepteer flag, propageer via WS_DRY_RUN env-var zodat
+# sub-installers 'm ook zien (zie design.md D2). Geen andere argumenten verwacht.
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) export WS_DRY_RUN=1 ;;
+    *)
+      echo "error: onbekend argument: $arg" >&2
+      echo "       Geldige flags: --dry-run, --version/-V" >&2
+      exit 2
+      ;;
+  esac
+done
+
+# Root-check overslaan in dry-run: een gebruiker wil de dispatch-keuze ook
+# zonder sudo kunnen voorspellen (CI / audit-evidence).
+if ! ws_is_dry_run && [[ $EUID -ne 0 ]]; then
   echo "Run als root: sudo bash bootstrap.sh" >&2
   exit 1
 fi
@@ -27,11 +54,9 @@ fi
 # shellcheck source=/dev/null
 source /etc/os-release
 
-dir="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
-
 dispatch() {
   local sub="$1"
-  local installer="$dir/$sub/install.sh"
+  local installer="${SCRIPT_DIR}/$sub/install.sh"
   # Toets alleen op bestaan — de installer wordt via `bash "$installer"`
   # aangeroepen en hoeft niet executable te zijn. De vorige check
   # ([[ ! -x && ! -f ]]) was tautologisch: een executable bestand is per
@@ -39,6 +64,11 @@ dispatch() {
   if [[ ! -f "$installer" ]]; then
     echo "error: installer ontbreekt: $installer" >&2
     exit 2
+  fi
+  if ws_is_dry_run; then
+    echo "Would dispatch to: $sub/install.sh"
+    echo "(dry-run; no changes made)"
+    return 0
   fi
   echo "==> ${PRETTY_NAME:-${ID:-onbekend}} → $sub/install.sh"
   bash "$installer"

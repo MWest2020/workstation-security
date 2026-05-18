@@ -16,6 +16,8 @@ readonly SCRIPT_DIR
 # shellcheck source=install-base.sh
 source "${SCRIPT_DIR}/install-base.sh"
 
+ws_handle_version "$@"
+
 echo "==> ClamAV signatures bijwerken..."
 # freshclam_safe stopt eerst clamav-freshclam.service voordat het freshclam
 # zelf draait — anders race't deze update-timer (04:00) tegen de active

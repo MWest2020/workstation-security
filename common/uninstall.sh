@@ -16,6 +16,8 @@ readonly SCRIPT_DIR
 # shellcheck source=/dev/null
 source "${SCRIPT_DIR}/lib.sh"
 
+ws_handle_version "$@"
+
 if [[ $EUID -ne 0 ]]; then
   echo "Run als root: sudo bash common/uninstall.sh" >&2
   exit 1

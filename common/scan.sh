@@ -18,6 +18,8 @@ readonly SCRIPT_DIR
 # shellcheck source=lib.sh
 source "${SCRIPT_DIR}/lib.sh"
 
+ws_handle_version "$@"
+
 LOG="/var/log/clamav/daily-scan.log"
 
 # WSL: sluit /mnt uit (Windows-drives via DrvFs). Native Linux: /mnt is

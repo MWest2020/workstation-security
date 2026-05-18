@@ -1,0 +1,64 @@
+# SPDX-License-Identifier: EUPL-1.2
+#
+# Smoke tests — draait bootstrap.sh --dry-run en check.sh in een container voor
+# elk van de ondersteunde distrofamilies. Geen side effects op de runner;
+# de container is ephemeral.
+#
+# Docker images: officiële Docker Hub images, rolling tag (zie design.md D4).
+# Pin alleen als CI breekt door upstream-wijziging (zie smoke-tests spec, scenario
+# "Rolling-image pinning bij upstream-breuk").
+
+name: smoke
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: alma9
+            image: almalinux:9
+          - distro: ubuntu2404
+            image: ubuntu:24.04
+          - distro: archlatest
+            image: archlinux:latest
+
+    name: smoke (${{ matrix.distro }})
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: bootstrap.sh --dry-run + check.sh in ${{ matrix.image }}
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/repo:ro" \
+            -w /repo \
+            "${{ matrix.image }}" \
+            bash -c '
+              set -e
+              echo "=== bootstrap.sh --version ==="
+              bash bootstrap.sh --version
+              echo
+              echo "=== bootstrap.sh --dry-run ==="
+              bash bootstrap.sh --dry-run
+              echo
+              echo "=== check.sh (read-only audit) ==="
+              # check.sh exit-code = aantal problemen (capped op 2).
+              # In een schone container met geen ClamAV install verwachten we
+              # warnings — toegestaan tot exit 2. Boven 2 betekent: check.sh
+              # zelf is stuk, niet de baseline-toestand.
+              bash check.sh || rc=$?
+              if [[ "${rc:-0}" -gt 2 ]]; then
+                echo "check.sh exit=${rc} > 2 — script-fout, niet alleen warnings" >&2
+                exit "${rc}"
+              fi
+              echo
+              echo "=== install-pm-cooldown.sh --dry-run ==="
+              bash common/install-pm-cooldown.sh --dry-run
+            '

@@ -1,6 +1,28 @@
 # Changelog
 
-## 2026-05-18 (avond) — Docs + review-fixes
+## Unreleased — v1.0.0-release-readiness (A2 + C1-C6)
+
+OpenSpec change: [`openspec/changes/v1-release-readiness/`](openspec/changes/v1-release-readiness/). Bundelt zeven kleine clusters richting v1.0.0-tag. PRs landen per cluster; tag wordt pas geplaatst als alles gemerged en CI groen is.
+
+### Toegevoegd
+- `VERSION`-file (top-level, semver `0.9.0`) als single source of truth voor versie. Helper `ws_version()` in `common/lib.sh` leest deze at-runtime; fallback `unknown` als de file ontbreekt (een script dat los gedownload werd faalt niet).
+- `--version` / `-V` flag op alle user-facing entrypoints: `bootstrap.sh`, `check.sh`, en elke `common/*.sh` met CLI (`install-pm-cooldown.sh`, `install-shell-tools.sh`, `incident-token-revoke.sh`, `scan.sh`, `rkhunter-check.sh`, `update.sh`, `uninstall.sh`). Werkt zonder sudo. Helper `ws_handle_version()` in `lib.sh` voor de scripts die lib.sh source'n; `incident-token-revoke.sh` houdt zijn self-contained inline-variant.
+- `--dry-run` flag op alle installers: `bootstrap.sh`, `alma/install.sh`, `arch/install.sh`, `ubuntu/install.sh`, `common/install-timers.sh`, `common/install-pm-cooldown.sh`. Geen side effects in dry-run; output copy-paste-baar naar een echte run. Flag propageert via `WS_DRY_RUN=1` env-var zodat dispatch-ketens 'm doorgeven (zie [`openspec/changes/v1-release-readiness/design.md`](openspec/changes/v1-release-readiness/design.md) D2). Helpers `ws_is_dry_run()` en `ws_run_or_print()` in `lib.sh`.
+- `docs/supply-chain-cooldown.md` — staat-op-zichzelf-doc voor laag 2: aanleiding (npm-incident 2026-05-11), mechanisme per package-manager met versie-vereisten, per-workstation vs per-project vs CI-scope-gap, override-flow voor urgente CVEs. README-sectie 2 verkort tot 3-4 zinnen + link.
+- `LICENSE` — volledige EUPL-1.2-tekst (van SPDX license-list-data, canoniek). Consistent met bestaande SPDX-headers per script.
+- `CONTRIBUTING.md` — project-status, "voor een goede PR", "welke PRs landen makkelijk/lastig", OpenSpec-workflow.
+- `.github/ISSUE_TEMPLATE/` — bug_report.md, distro_support.md, config.yml (`blank_issues_enabled: false`, met link naar README).
+- `.github/workflows/smoke.yml` — GitHub Actions smoke-test matrix (alma9, ubuntu2404, archlatest via officiële Docker Hub images). Draait `bootstrap.sh --version`, `bootstrap.sh --dry-run`, `check.sh`, en `install-pm-cooldown.sh --dry-run` op elke push/PR. Geen side effects op de runner.
+- OpenSpec scaffolding (`openspec/` directory) met de v1-release-readiness change (proposal, tasks, design, drie spec-deltas).
+
+### Gewijzigd
+- `README.md` — herstructureerd: badges bovenaan (smoke, license, shellcheck), doelgroep/scope gepromoveerd vóór de drie verdedigingslagen, elke laag eigen H2 met "wat", "voor wie", "snelle start", clone-URL gecorrigeerd naar `MWest2020/`, expliciete `## License`-sectie onderaan met EUPL-1.2-motivatie (digitale soevereiniteit, NLnet-context).
+- `bootstrap.sh` — source't `common/lib.sh` voor versioning/dry-run helpers, root-check overgeslagen in dry-run-modus (CI-bruikbaar zonder sudo).
+- `common/install-base.sh` — `require_root`, `freshclam_safe`, `rkhunter_init`, `enable_clamav_services` zijn nu dry-run-aware (printen wat ze zouden doen).
+- `common/install-timers.sh` — `ws_write_unit` wrapper rond elke `cat >file <<HEREDOC`; in dry-run print de unit-inhoud naar stdout in plaats van naar `/etc/systemd/system/`. Drift-smoke-test wordt overgeslagen in dry-run (zou false-failen).
+- `common/install-pm-cooldown.sh` — `--dry-run` print de zou-toegepast-zijn upserts plus huidige staat ter referentie, raakt `~/.npmrc` en `~/.bunfig.toml` niet aan.
+- `common/incident-token-revoke.sh` — `SCRIPT_VERSION` leest nu uit het top-level `VERSION`-bestand (met `unknown`-fallback), in plaats van een hard-coded constant. Blijft self-contained (geen lib.sh-source).
+- `docs/README.md` — index-tabel uitgebreid met `supply-chain-cooldown.md`.
 
 ### Toegevoegd
 - `docs/` directory met aanvullende documentatie naast hoofd-README. Drie files: `README.md` (index, hoe te gebruiken per audience), `compliance.md` (mapping van workstation-security componenten op control-IDs in vier frameworks: ISO 27001:2022 Annex A, SOC 2 Trust Services Criteria 2017 CC6/CC7/CC8/CC9, NEN 7510-2:2017, en BIO V1.04), en `threat-model.md` (in-scope/out-of-scope met expliciete reasoning en operating assumptions). Aanleiding: audit-evidence wordt sterker wanneer een auditor naar `docs/compliance.md#A.8.7` kan navigeren in plaats van scripts te moeten lezen. Eerste pass — control-mapping is geverifieerd tegen framework-hoofdsecties maar niet woord-voor-woord tegen de letterlijke control-tekst. Voor audit-ready scope: trim de doc tot de frameworks die voor die specifieke audit in scope zijn en valideer dáár woord-voor-woord.

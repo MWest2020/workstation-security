@@ -25,8 +25,16 @@
 #   bash common/install-pm-cooldown.sh             # default 7 dagen
 #   bash common/install-pm-cooldown.sh --days 14   # custom window
 #   bash common/install-pm-cooldown.sh --check     # alleen huidige state tonen
+#   bash common/install-pm-cooldown.sh --dry-run   # print zou-toegepast-zijn wijzigingen, geen schrijven
+#   bash common/install-pm-cooldown.sh --version   # print versie en exit
 
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
+
+# shellcheck source=lib.sh
+source "${SCRIPT_DIR}/lib.sh"
 
 readonly NPMRC="${HOME}/.npmrc"
 readonly BUNFIG="${HOME}/.bunfig.toml"
@@ -36,14 +44,16 @@ mode="install"
 
 usage() {
   cat <<'EOF'
-Usage: install-pm-cooldown.sh [--days N] [--check] [-h]
+Usage: install-pm-cooldown.sh [--days N] [--check] [--dry-run] [-h]
 
 Installeert N-daagse package-manager cooldown voor npm, pnpm en bun.
 
 Opties:
-  --days N    Cooldown-venster in dagen (default 7, min 1).
-  --check     Toon alleen huidige cooldown-staat, wijzig niets.
-  -h, --help  Deze tekst.
+  --days N        Cooldown-venster in dagen (default 7, min 1).
+  --check         Toon alleen huidige cooldown-staat, wijzig niets.
+  --dry-run       Print de config-wijzigingen die zouden plaatsvinden, raak files niet aan.
+  --version, -V   Print versie en exit.
+  -h, --help      Deze tekst.
 
 Files: ~/.npmrc en ~/.bunfig.toml (bestaande inhoud blijft behouden).
 EOF
@@ -61,6 +71,11 @@ parse_args() {
         days="$1"
         ;;
       --check) mode="check" ;;
+      --dry-run) export WS_DRY_RUN=1 ;;
+      --version | -V)
+        echo "workstation-security $(ws_version)"
+        exit 0
+        ;;
       -h | --help)
         usage
         exit 0
@@ -201,6 +216,19 @@ main() {
   local npm_days="$days"
   local pnpm_minutes=$((days * 24 * 60))
   local bun_seconds=$((days * 24 * 60 * 60))
+
+  if ws_is_dry_run; then
+    echo "Would install ${days}-day package-manager cooldown:"
+    echo "  ${NPMRC}: would upsert min-release-age=${npm_days} (npm)"
+    echo "  ${NPMRC}: would upsert minimum-release-age=${pnpm_minutes} (pnpm, minuten)"
+    echo "  ${BUNFIG}: would upsert [install] minimumReleaseAge=${bun_seconds} (bun, seconden)"
+    echo ""
+    echo "Huidige staat ter referentie:"
+    check_only
+    echo ""
+    echo "(dry-run; no changes made)"
+    exit 0
+  fi
 
   echo "Installing ${days}-day package-manager cooldown..."
 

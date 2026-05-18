@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-05-18 (avond) — Docs + review-fixes
+
+### Toegevoegd
+- `docs/` directory met aanvullende documentatie naast hoofd-README. Drie files: `README.md` (index, hoe te gebruiken per audience), `compliance.md` (mapping van workstation-security componenten op control-IDs in vier frameworks: ISO 27001:2022 Annex A, SOC 2 Trust Services Criteria 2017 CC6/CC7/CC8/CC9, NEN 7510-2:2017, en BIO V1.04), en `threat-model.md` (in-scope/out-of-scope met expliciete reasoning en operating assumptions). Aanleiding: audit-evidence wordt sterker wanneer een auditor naar `docs/compliance.md#A.8.7` kan navigeren in plaats van scripts te moeten lezen. Eerste pass — control-mapping is geverifieerd tegen framework-hoofdsecties maar niet woord-voor-woord tegen de letterlijke control-tekst. Voor audit-ready scope: trim de doc tot de frameworks die voor die specifieke audit in scope zijn en valideer dáár woord-voor-woord.
+
+### Gefixt (vier bugs uit review op de WSL-commits c349766 / abb1f8d)
+- `common/update.sh` riep `freshclam` direct aan i.p.v. `freshclam_safe`. `clamav-freshclam.service` houdt de log-lock vast; een tweede freshclam-aanroep faalt silently. `av-update.timer` (04:00) race't dus tegen de daemon na `enable_clamav_services`. Effect: stale signatures als audit-non-conformity. Fix: source `install-base.sh`, gebruik `freshclam_safe` die de service eerst stopt.
+- `arch/install.sh` gebruikte `pacman -Sy --noconfirm clamav` zonder `-u`. Partial-upgrade is op Arch een footgun: package-database wordt ververst terwijl geïnstalleerde packages oud blijven; verse deps matchen niet meer met oude binaries. Fix: `pacman -Syu --noconfirm`.
+- `bootstrap.sh:35` had `[[ ! -x "$installer" && ! -f "$installer" ]]` — tautologisch (een executable bestand is per definitie ook een bestand). De `-f`-tak verzwakte de check tot "alleen falen als beide false". Fix: vereenvoudigd tot `[[ ! -f "$installer" ]]`.
+- `common/incident-token-revoke.sh::detect_heuristic` gebruikte `grep -rlE` zonder `-I`. Op een corrupt of binair bestand stopt grep met non-zero exit; alle hits in die find-walk daarna gaan verloren (de `|| true` vangt de exit, partial output is al kwijt). In een IR-context (silent-miss > over-flag) verkeerde failure-mode. Fix: `grep -rlEI`.
+
+### Gewijzigd
+- `common/install-shell-tools.sh` — sha256-verificatie toegevoegd voor `shfmt` en `gitleaks` downloads. `verify_sha256()` (pure check, geen side-effects op het bestand) + `fetch_expected_sha256()` (haalt verwachte hash uit upstream sha256sums.txt / checksums.txt). Bij mismatch: caller rmt de tmpfile en return 1. Unit-getest: positive match werkt, negative case wordt rejected zonder destructive side-effect. Ironie-fix: een tool die over supply-chain-paranoia gaat, mag zelf niet binaries downloaden zonder integriteits-check.
+- `common/rkhunter-check.sh` — WSL-skip met expliciete uitleg. `rkhunter --check` geeft op WSL false-positives op /proc-checks, passwd-checks rond WSL's init-proces, en system_configs.t (verwacht init-scripts). Daily wall-notificaties met onbetrouwbare waarschuwingen leiden tot alarm-fatigue — op zichzelf een ISO 27001-bevinding. Plus: WSL's container-isolatie verandert het rootkit-bedreigingsmodel; Defender/EDR op de Windows-host is daar de juiste laag.
+- `common/incident-token-revoke.sh` — clipboard-cascade uitgebreid met `clip.exe` (WSL2 native, altijd in PATH via wsl-interop). URL-opener toegevoegd: `wslview` (uit wslu package) of `cmd.exe /c start <url>` als fallback — opent de Windows-default-browser direct vanuit WSL. In een IR-context tellen seconden tussen detect en revoke; minder manual context-switching helpt.
+- `README.md` — link naar `docs/` toegevoegd in intro + BIO toegevoegd aan framework-lijst. WSL Support compatibility-matrix uitgebreid met rkhunter (bewust uit op WSL) + clipboard-rij.
+
 ## 2026-05-18 (later)
 
 ### Toegevoegd

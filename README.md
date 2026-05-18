@@ -2,8 +2,12 @@
 
 Lichtgewicht baseline voor het hardenen van developer workstations. Bedoeld
 om de minimale set verdedigingen op orde te hebben die je voor een ISO 27001
-/ SOC 2 / NEN 7510 audit moet kunnen aantonen, zonder een full-blown EDR
-uit te rollen.
+/ SOC 2 / NEN 7510 / BIO audit moet kunnen aantonen, zonder een full-blown
+EDR uit te rollen.
+
+Voor mappings naar specifieke control-IDs en het bedreigingsmodel: zie
+[`docs/`](docs/) — `compliance.md` voor de framework-mapping,
+`threat-model.md` voor wat we wel/niet verdedigen.
 
 ## Drie verdedigingslagen
 

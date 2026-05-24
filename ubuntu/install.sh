@@ -31,7 +31,10 @@ echo "==> Signatures downloaden..."
 freshclam_safe
 
 echo "==> Services aanzetten..."
-enable_clamav_services clamav-daemon clamav-freshclam
+# clamav-freshclam.service uit zetten — av-update.timer doet de signature-
+# update om 04:00; twee mechanismen race'n op de freshclam log-lock.
+disable_freshclam_daemon
+enable_clamav_services clamav-daemon
 
 echo "==> rkhunter installeren..."
 if apt-get install -y rkhunter 2>/dev/null; then

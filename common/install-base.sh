@@ -37,10 +37,28 @@ require_root() {
 }
 
 # freshclam draait niet als de daemon de log-lock vasthoudt — stop hem eerst.
-# Best-effort: faalt zonder error als de service niet bestaat.
+# Best-effort: faalt zonder error als de service niet bestaat. Sinds we de
+# OS-default clamav-freshclam.service niet meer enable'n (zie
+# disable_freshclam_daemon hieronder) is de stop-call doorgaans een no-op, maar
+# we houden hem als defensieve safety net voor (a) gemigreerde installs en (b)
+# omgevingen waar een andere pakketmanager de daemon alsnog aan zet.
 freshclam_safe() {
   systemctl stop clamav-freshclam 2>/dev/null || true
   freshclam
+}
+
+# Schakel de OS-default clamav-freshclam.service uit. Dit project gebruikt
+# av-update.timer (04:00) als enige signature-update mechanisme — twee
+# concurrent mechanismen race'n op de freshclam log-lock, en update.sh's
+# `systemctl stop` voor freshclam_safe laat de daemon permanent dood achter
+# (de service wordt nooit herstart). Eén mechanisme = boring & auditable.
+# Idempotent: no-op als de service niet bestaat of al disabled is, en op
+# WSL zonder systemd.
+disable_freshclam_daemon() {
+  if ! ws_systemd_available; then
+    return 0
+  fi
+  systemctl disable --now clamav-freshclam 2>/dev/null || true
 }
 
 # rkhunter database update + propupd. Caller bepaalt zelf of een

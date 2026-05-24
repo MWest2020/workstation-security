@@ -71,7 +71,6 @@ UNIT
 cat >"$UNIT_DIR/clamav-scan.service" <<UNIT
 [Unit]
 Description=ClamAV dagelijkse scan
-After=clamav-freshclam.service
 
 [Service]
 Type=oneshot

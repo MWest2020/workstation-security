@@ -35,19 +35,33 @@ if ws_systemd_available; then
   # zou geven dat door `pipefail` als pipeline-failure binnenkomt — false skip).
   units_output="$(systemctl list-units --full --all 2>/dev/null)"
 
-  # Detecteer welke ClamAV-service-naam actief is (Alma vs Arch vs Ubuntu).
+  # Detecteer welke ClamAV-scan-daemon actief is (Alma: clamd@scan;
+  # Arch/Ubuntu: clamav-daemon). First-active-wins: zodra een candidate
+  # actief is, klaar — andere candidates worden niet als fout gerapporteerd
+  # ook al staan ze loaded-but-inactive in list-units (b.v. omdat een vorig
+  # package-install ze ooit heeft opgestart). Maximaal 1 error uit deze sectie.
+  scan_daemon_active=""
+  scan_daemon_loaded=""
   for svc in "${WS_CLAMAV_DAEMON_CANDIDATES[@]}"; do
     if ! grep -qE "^${svc}\b|^  ${svc}" <<<"$units_output"; then
       continue
     fi
+    scan_daemon_loaded="$svc"
     status="$(systemctl is-active "$svc" 2>/dev/null || echo "inactive")"
     if [[ "$status" == "active" ]]; then
+      scan_daemon_active="$svc"
       ws_ok "$svc"
-    else
-      ws_fail "$svc (inactive)"
-      ((errors++)) || true
+      break
     fi
   done
+  if [[ -z "$scan_daemon_active" ]]; then
+    if [[ -n "$scan_daemon_loaded" ]]; then
+      ws_fail "$scan_daemon_loaded (inactive)"
+    else
+      ws_fail "geen ClamAV scan-daemon gevonden (clamd@scan / clamav-daemon)"
+    fi
+    ((errors++)) || true
+  fi
 
   echo ""
   echo "Timers:"

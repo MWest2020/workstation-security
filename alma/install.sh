@@ -43,7 +43,11 @@ if command -v setsebool >/dev/null 2>&1; then
 fi
 
 echo "==> Services aanzetten..."
-enable_clamav_services clamd@scan clamav-freshclam
+# clamav-freshclam.service is dnf-default enabled — uit zetten, want
+# av-update.timer (zie install_timers) is in deze repo het enige signature-
+# update mechanisme.
+disable_freshclam_daemon
+enable_clamav_services clamd@scan
 
 echo "==> rkhunter installeren..."
 if dnf install -y rkhunter 2>/dev/null; then

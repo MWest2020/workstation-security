@@ -47,10 +47,13 @@ readonly WS_SERVICES_GENERATED=(
   "rkhunter-check.service"
 )
 
-# --- ClamAV-daemon kandidaten per OS (eerste actieve wint in check.sh) ---
+# --- ClamAV scan-daemon kandidaten per OS (eerste actieve wint in check.sh) ---
+# Alleen scan-daemons (clamd) — niet de freshclam signature-updater. Signature-
+# updates draaien via av-update.timer; clamav-freshclam.service wordt door
+# disable_freshclam_daemon expliciet uit gezet (zie common/install-base.sh).
+# Alma ships clamd@scan; Arch/Ubuntu ships clamav-daemon.
 # shellcheck disable=SC2034  # gesourced extern (check.sh)
 readonly WS_CLAMAV_DAEMON_CANDIDATES=(
-  "clamav-freshclam"
   "clamd@scan"
   "clamav-daemon"
 )

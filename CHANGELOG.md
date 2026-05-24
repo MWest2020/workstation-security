@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-05-24 — Freshclam-daemon redundantie weg + check.sh first-active-wins symmetrie
+
+### Gefixt (twee bugs, ontdekt doordat `check.sh` op een sinds 2026-05-19 idle `clamav-freshclam.service` bleef vlaggen)
+
+- **Daemon-laat-dood-achter bug** — `common/install-base.sh::freshclam_safe` stopt `clamav-freshclam.service` voordat het `freshclam` als oneshot draait, maar herstart de daemon niet. Sinds 2026-05-18 wordt deze helper ook door `av-update.timer` (04:00) gebruikt (voorheen alleen install-tijd). Effect: de eerste keer dat de timer vuurde stopte hij de daemon, die nooit meer aanging. Functioneel niet erg (signatures bleven vers via diezelfde timer-oneshot), maar wel een audit-irritant: ✗ in `check.sh`-output zonder dat er iets stuk was, plus stale runtime-state ("enabled but dead" daemon). Root cause: twee mechanismen voor één taak (long-running freshclam-daemon + oneshot-via-timer) die elkaars log-lock blokkeren. Fix: één mechanisme. `disable_freshclam_daemon` nieuwe helper in `install-base.sh`; `alma/install.sh`, `arch/install.sh`, `ubuntu/install.sh` roepen hem aan en laten `clamav-freshclam` weg uit `enable_clamav_services`. `clamav-scan.service` heeft `After=clamav-freshclam.service` niet meer (dependency op een ge-disable'd unit is misleidend; scan 02:00 vs update 04:00 conflicteren toch niet). `freshclam_safe` blijft bestaan als defensieve safety net voor gemigreerde installs en post-pakket-update scenario's waar de daemon alsnog door dnf/apt-preset wordt aangezet.
+
+- **check.sh first-active-wins symmetrie** — comment in `common/lib.sh::WS_CLAMAV_DAEMON_CANDIDATES` zei *"eerste actieve wint in check.sh"*, maar de loop in `check.sh` iterateerde alle candidates en deed `((errors++))` op iedere inactieve. Op Alma stonden zowel `clamav-freshclam` als `clamd@scan` in `systemctl list-units`, dus alle twee werden geëvalueerd terwijl er maar één scan-daemon-actief-nodig is. Plus: `clamav-freshclam` is geen scan-daemon — het is de signature-updater die we niet meer gebruiken. Fix: `clamav-freshclam` uit `WS_CLAMAV_DAEMON_CANDIDATES` (alleen scan-daemons over: `clamd@scan`, `clamav-daemon`). `check.sh` loopt nu met early-break op de eerste actieve hit; maximaal 1 error uit deze sectie, comment en gedrag matchen.
+
+### Migratie-stap voor bestaande installs
+
+Eénmalig per machine (bestaande installs hebben `clamav-freshclam.service` nog als `enabled but inactive` staan; nieuwe installs via `bootstrap.sh` doen dit automatisch):
+
+```bash
+sudo systemctl daemon-reload                          # ruimt pending warning op
+sudo systemctl disable --now clamav-freshclam.service # weg uit enabled-set
+```
+
+Daarna brengt `bash check.sh` een schoon overzicht zonder de spurious freshclam-fail.
+
 ## 2026-05-18 (avond) — Docs + review-fixes
 
 ### Toegevoegd

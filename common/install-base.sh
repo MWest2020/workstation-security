@@ -37,21 +37,33 @@ require_root() {
 }
 
 # freshclam draait niet als de daemon de log-lock vasthoudt — stop hem eerst.
-# Best-effort: faalt zonder error als de service niet bestaat. Sinds we de
-# OS-default clamav-freshclam.service niet meer enable'n (zie
-# disable_freshclam_daemon hieronder) is de stop-call doorgaans een no-op, maar
-# we houden hem als defensieve safety net voor (a) gemigreerde installs en (b)
-# omgevingen waar een andere pakketmanager de daemon alsnog aan zet.
+# Best-effort: faalt zonder error als de service niet bestaat. Sinds we
+# clamav-freshclam.service zelf niet meer enable'n (zie disable_freshclam_daemon
+# hieronder) is de stop-call op een verse install doorgaans een no-op, maar we
+# houden hem als defensieve safety net voor (a) gemigreerde installs en (b)
+# Ubuntu/Debian waar debhelper-systemd hem bij een `apt --reinstall` opnieuw
+# enable kan zetten.
 freshclam_safe() {
   systemctl stop clamav-freshclam 2>/dev/null || true
   freshclam
 }
 
-# Schakel de OS-default clamav-freshclam.service uit. Dit project gebruikt
-# av-update.timer (04:00) als enige signature-update mechanisme — twee
-# concurrent mechanismen race'n op de freshclam log-lock, en update.sh's
-# `systemctl stop` voor freshclam_safe laat de daemon permanent dood achter
-# (de service wordt nooit herstart). Eén mechanisme = boring & auditable.
+# Schakel clamav-freshclam.service uit als hij door pakket-install enabled
+# werd. Dit project gebruikt av-update.timer (04:00) als enige signature-
+# update mechanisme — twee concurrent mechanismen race'n op de freshclam
+# log-lock, en update.sh's `systemctl stop` voor freshclam_safe laat de
+# daemon permanent dood achter (de service wordt nooit herstart). Eén
+# mechanisme = boring & auditable.
+#
+# Re-enable risico per distro:
+#   Alma  — preset is `disabled`; dnf install/reinstall raakt 'm niet aan.
+#   Arch  — pacman draait geen preset; service is by default off.
+#   Ubuntu/Debian — debhelper-systemd postinst kan bij `apt install --reinstall`
+#                   van clamav-daemon de freshclam-service opnieuw enable'n;
+#                   deze functie corrigeert dat als de installer opnieuw
+#                   gedraaid wordt, en freshclam_safe (in update.sh) vangt
+#                   het dagelijks tijdelijk op met een stop voor freshclam.
+#
 # Idempotent: no-op als de service niet bestaat of al disabled is, en op
 # WSL zonder systemd.
 disable_freshclam_daemon() {

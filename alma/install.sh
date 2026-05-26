@@ -43,9 +43,11 @@ if command -v setsebool >/dev/null 2>&1; then
 fi
 
 echo "==> Services aanzetten..."
-# clamav-freshclam.service is dnf-default enabled — uit zetten, want
-# av-update.timer (zie install_timers) is in deze repo het enige signature-
-# update mechanisme.
+# clamav-freshclam.service uit zetten. Alma's upstream systemd-preset voor
+# deze unit is `disabled` (zie `systemctl show -p UnitFilePreset`), dus een
+# verse dnf-install zet 'm niet aan; deze call is voor migratie van eerdere
+# installs waar onze installer hem nog expliciet enable'de. av-update.timer
+# (zie install_timers) is in deze repo het enige signature-update mechanisme.
 disable_freshclam_daemon
 enable_clamav_services clamd@scan
 

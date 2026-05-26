@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-05-26 — rkhunter-init robuust + install-strategie expliciet gedocumenteerd
+
+### Toegevoegd
+
+- `docs/strategy.md` — install-strategie expliciet beschreven. Aanleiding: tijdens een `sudo bash check.sh`-run kwam aan het licht dat rkhunter wél geïnstalleerd was (`rkhunter-1.4.6-31.el10_2.noarch` op Alma 10.1) maar de property-database `/var/lib/rkhunter/db/rkhunter.dat` ontbrak. De aanname dat rkhunter op Alma 10 "geskipt" werd klopte niet — een halve install met onduidelijk eindplaatje is een audit-irritant. De nieuwe doc beschrijft de best-effort-filosofie ("doe wat kan, meld wat niet, ga door"), per-component-status (required/optional), failure-modes, een per-OS×runtime-verwachtingsmatrix, en hoe `check.sh`-output te interpreteren bij een partial install. `docs/README.md` en hoofd-README linken er beide naar.
+
+### Gefixt
+
+- `common/install-base.sh::rkhunter_init` — wrap `rkhunter --update` en `rkhunter --propupd` zelf onder `set +e`/`-e` en return een aparte status. Reden: rkhunter 1.4.x leunt intern op deprecated `egrep` en kan `--update` met non-zero exit eindigen zonder dat er functioneel iets fout is. Onder `set -euo pipefail` aborteerde dat de daaropvolgende `--propupd`, met als resultaat een geïnstalleerde rkhunter zonder `.dat` property-database — `check.sh` (als root) faalde permanent op "rkhunter database niet gevonden". De wrapper was tot nu toe alleen in `arch/install.sh` aanwezig met de motivering "Arch-specifieke quirk", maar het is rkhunter-1.4-specifiek, dus de wrapper hoort in de helper. `arch/install.sh` mag nu de eigen wrapper laten vallen.
+- `alma/install.sh`, `arch/install.sh`, `ubuntu/install.sh` — `dnf/pacman/apt install -y rkhunter 2>/dev/null` heeft de `2>/dev/null`-mute verloren. Pakket-install-foutmeldingen (EPEL niet ingeschakeld, mirror onbereikbaar, key verlopen, …) moet je kunnen zien; silent-skip-met-onbekende-reden is precies wat een audit niet wil. Bij een `rkhunter_init`-falen print de installer nu een retry-hint (`sudo rkhunter --propupd`) zodat een gebruiker de partial state in één commando kan repareren.
+
+### Migratie-stap voor bestaande installs
+
+Eénmalig (alleen waar `check.sh` als root ✗ rkhunter database niet gevonden meldt):
+
+```bash
+sudo rkhunter --propupd        # rebuild de property-database
+sudo bash check.sh             # verifieer: alles ✓
+```
+
 ## 2026-05-24 — Freshclam-daemon redundantie weg + check.sh first-active-wins symmetrie
 
 ### Gefixt (twee bugs, ontdekt doordat `check.sh` op een sinds 2026-05-19 idle `clamav-freshclam.service` bleef vlaggen)

@@ -7,7 +7,9 @@ EDR uit te rollen.
 
 Voor mappings naar specifieke control-IDs en het bedreigingsmodel: zie
 [`docs/`](docs/) — `compliance.md` voor de framework-mapping,
-`threat-model.md` voor wat we wel/niet verdedigen.
+`threat-model.md` voor wat we wel/niet verdedigen, en `strategy.md` voor
+hoe de installer zich gedraagt op een nieuwe machine (welke componenten
+required vs optional zijn en wat te doen bij een partial install).
 
 ## Drie verdedigingslagen
 

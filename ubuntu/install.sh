@@ -37,9 +37,17 @@ disable_freshclam_daemon
 enable_clamav_services clamav-daemon
 
 echo "==> rkhunter installeren..."
-if apt-get install -y rkhunter 2>/dev/null; then
-  rkhunter_init
-  rkhunter_ok=1
+# Geen `2>/dev/null`: apt-failure-reasons willen we zien (held-back, key-
+# verlopen, etc.) i.p.v. silent skip. rkhunter_init wrapt zelf set +e/-e
+# rond --update en --propupd (rkhunter 1.4 + deprecated egrep).
+if apt-get install -y rkhunter; then
+  if rkhunter_init; then
+    rkhunter_ok=1
+  else
+    echo "  rkhunter init kreeg non-zero exit (zie ws_warn hierboven)."
+    echo "  Controleer:  sudo ls -l /var/lib/rkhunter/db/rkhunter.dat"
+    echo "  Ontbreekt de .dat? Draai dan handmatig: sudo rkhunter --propupd"
+  fi
 else
   echo "  rkhunter niet beschikbaar via apt — wordt overgeslagen."
 fi

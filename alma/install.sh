@@ -52,11 +52,19 @@ disable_freshclam_daemon
 enable_clamav_services clamd@scan
 
 echo "==> rkhunter installeren..."
-if dnf install -y rkhunter 2>/dev/null; then
-  rkhunter_init
-  rkhunter_ok=1
+# Geen `2>/dev/null`: als dnf rkhunter niet kan installeren willen we de reden
+# zien (EPEL niet ingeschakeld, repo-fout, etc.) i.p.v. een silent skip.
+if dnf install -y rkhunter; then
+  if rkhunter_init; then
+    rkhunter_ok=1
+  else
+    echo "  rkhunter init kreeg non-zero exit (zie ws_warn hierboven)."
+    echo "  Controleer met:  sudo ls -l /var/lib/rkhunter/db/rkhunter.dat"
+    echo "  Ontbreekt de .dat? Draai dan handmatig: sudo rkhunter --propupd"
+  fi
 else
-  echo "  rkhunter niet beschikbaar via dnf (Alma 10?) — wordt overgeslagen."
+  echo "  rkhunter niet beschikbaar via dnf — wordt overgeslagen."
+  echo "  Op Alma 10 vereist rkhunter EPEL: 'sudo dnf install epel-release'."
 fi
 
 echo "==> Timers installeren..."

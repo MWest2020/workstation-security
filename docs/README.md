@@ -10,6 +10,7 @@ collega's die de tool overnemen, of jij over zes maanden.
 |---|---|---|
 | [`compliance.md`](compliance.md) | Auditor, security officer, sales-ondersteuning | Mapping van workstation-security componenten op specifieke control-IDs in ISO 27001:2022, SOC 2 (CC6/CC7), NEN 7510-2:2017 en BIO. Plus expliciete gap-lijst. |
 | [`threat-model.md`](threat-model.md) | Implementatie-engineers, security-reviewers | Wat verdedigen we WEL, wat NIET. Voorkomt scope-creep en zet verwachtingen voor wat dit script kan oplossen. |
+| [`strategy.md`](strategy.md) | Nieuwe gebruikers die de repo clonen, ops-engineers die een partial install moeten interpreteren | Welke componenten zijn required/optional, wat doet de installer als iets niet beschikbaar is, en hoe lees je `check.sh`-output. |
 
 ## Hoe deze docs te gebruiken
 
@@ -21,12 +22,14 @@ collega's die de tool overnemen, of jij over zes maanden.
 
 **Vóór een nieuwe deployment:**
 1. Lees `threat-model.md` — bevestig dat het bedreigingsmodel matcht
-2. Bij mismatch: óf scope uitbreiden, óf de discrepantie expliciet
+2. Lees `strategy.md` — controleer welke componenten op de doel-distro
+   automatisch werken en welke handmatig nawerk vragen
+3. Bij mismatch: óf scope uitbreiden, óf de discrepantie expliciet
    documenteren in jouw eigen risk-register
 
 **Bij een wijziging aan een script:**
-1. Update beide docs als de wijziging de control-coverage of het
-   bedreigingsmodel raakt
+1. Update de relevante docs als de wijziging de control-coverage, het
+   bedreigingsmodel, of de component-status (required/optional) raakt
 2. CHANGELOG.md krijgt de wijzigings-entry; deze docs krijgen de
    beschrijvende mapping-update
 

@@ -73,12 +73,29 @@ disable_freshclam_daemon() {
   systemctl disable --now clamav-freshclam 2>/dev/null || true
 }
 
-# rkhunter database update + propupd. Caller bepaalt zelf of een
-# distro-specifieke quirk een set +e/-e-wrapper nodig heeft (Arch ships een
-# rkhunter die op deprecated egrep een non-zero terugkomt — zie arch/install.sh).
+# rkhunter database update + property-database (re)bouwen. rkhunter 1.4.x
+# (huidig op Alma/Arch/Ubuntu) leunt intern op deprecated `egrep`; --update
+# kan daardoor met non-zero exit eindigen terwijl er functioneel niets fout
+# is. Onder `set -e` zou dat de erop volgende --propupd skippen, met als
+# resultaat een geïnstalleerde rkhunter zonder rkhunter.dat property-
+# database. `check.sh` faalt vervolgens permanent op "rkhunter database
+# niet gevonden". Daarom hier defensieve set +e/-e rond beide calls.
+#
+# Return-code: 0 als beide commands lukten, anders 1 (caller beslist of dat
+# tot rkhunter_ok=0 leidt of dat er een retry-hint geprint moet worden).
 rkhunter_init() {
+  local update_rc propupd_rc
+  set +e
   rkhunter --update
+  update_rc=$?
   rkhunter --propupd
+  propupd_rc=$?
+  set -e
+  if [[ $update_rc -ne 0 ]] || [[ $propupd_rc -ne 0 ]]; then
+    ws_warn "rkhunter init: --update rc=${update_rc} --propupd rc=${propupd_rc}"
+    return 1
+  fi
+  return 0
 }
 
 # Enable + start een lijst van clamav-gerelateerde services.

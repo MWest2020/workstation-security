@@ -45,14 +45,18 @@ disable_freshclam_daemon
 enable_clamav_services clamav-daemon
 
 echo "==> rkhunter installeren..."
-if pacman -S --noconfirm rkhunter 2>/dev/null; then
-  # Quirk: rkhunter in Arch gebruikt deprecated egrep en geeft non-zero exit
-  # bij --update; --propupd is wel betrouwbaar. set -e tijdelijk uit om
-  # vroegtijdig exit te voorkomen.
-  set +e
-  rkhunter_init
-  set -e
-  rkhunter_ok=1
+# Geen `2>/dev/null`: pacman-failure-reasons willen we zien (mirror onbereik-
+# baar, package-conflict, etc.). De set +e-wrapper rond rkhunter_init zit
+# tegenwoordig in install-base.sh — rkhunter 1.4 + deprecated egrep is
+# rkhunter-quirk, niet Arch-specifiek.
+if pacman -S --noconfirm rkhunter; then
+  if rkhunter_init; then
+    rkhunter_ok=1
+  else
+    echo "  rkhunter init kreeg non-zero exit (zie ws_warn hierboven)."
+    echo "  Controleer:  sudo ls -l /var/lib/rkhunter/db/rkhunter.dat"
+    echo "  Ontbreekt de .dat? Draai dan handmatig: sudo rkhunter --propupd"
+  fi
 else
   echo "  rkhunter niet beschikbaar via pacman — wordt overgeslagen."
 fi

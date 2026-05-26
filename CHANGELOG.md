@@ -1,8 +1,55 @@
 # Changelog
 
-## Unreleased — Python support in `install-pm-cooldown.sh` (uv + pip)
+## Unreleased
 
-### Toegevoegd
+### 2026-05-26 — rkhunter-init robuust + install-strategie expliciet gedocumenteerd
+
+#### Toegevoegd
+
+- `docs/strategy.md` — install-strategie expliciet beschreven. Aanleiding: tijdens een `sudo bash check.sh`-run kwam aan het licht dat rkhunter wél geïnstalleerd was (`rkhunter-1.4.6-31.el10_2.noarch` op Alma 10.1) maar de property-database `/var/lib/rkhunter/db/rkhunter.dat` ontbrak. De aanname dat rkhunter op Alma 10 "geskipt" werd klopte niet — een halve install met onduidelijk eindplaatje is een audit-irritant. De nieuwe doc beschrijft de best-effort-filosofie ("doe wat kan, meld wat niet, ga door"), per-component-status (required/optional), failure-modes, een per-OS×runtime-verwachtingsmatrix, en hoe `check.sh`-output te interpreteren bij een partial install. `docs/README.md` en hoofd-README linken er beide naar.
+
+#### Gefixt
+
+- `common/install-base.sh::rkhunter_init` — wrap `rkhunter --update` en `rkhunter --propupd` zelf onder `set +e`/`-e` (in de real-run pad; dry-run blijft `ws_run_or_print`-based) en return een aparte status. Reden: rkhunter 1.4.x leunt intern op deprecated `egrep` en kan `--update` met non-zero exit eindigen zonder dat er functioneel iets fout is. Onder `set -euo pipefail` aborteerde dat de daaropvolgende `--propupd`, met als resultaat een geïnstalleerde rkhunter zonder `.dat` property-database — `check.sh` (als root) faalde permanent op "rkhunter database niet gevonden". De wrapper was tot nu toe alleen in `arch/install.sh` aanwezig met de motivering "Arch-specifieke quirk", maar het is rkhunter-1.4-specifiek, dus de wrapper hoort in de helper. `arch/install.sh` mag nu de eigen wrapper laten vallen.
+- `alma/install.sh`, `arch/install.sh`, `ubuntu/install.sh` — `dnf/pacman/apt install -y rkhunter 2>/dev/null` heeft de `2>/dev/null`-mute verloren op het real-run pad. Pakket-install-foutmeldingen (EPEL niet ingeschakeld, mirror onbereikbaar, key verlopen, …) moet je kunnen zien; silent-skip-met-onbekende-reden is precies wat een audit niet wil. Bij een `rkhunter_init`-falen print de installer nu een retry-hint (`sudo rkhunter --propupd`) zodat een gebruiker de partial state in één commando kan repareren. Dry-run-pad blijft `ws_run_or_print`-based.
+
+#### Migratie-stap voor bestaande installs
+
+Eénmalig (alleen waar `check.sh` als root ✗ rkhunter database niet gevonden meldt):
+
+```bash
+sudo rkhunter --propupd        # rebuild de property-database
+sudo bash check.sh             # verifieer: alles ✓
+```
+
+### 2026-05-24 — Freshclam-daemon redundantie weg + check.sh first-active-wins symmetrie + summary herhaalt welk probleem
+
+#### Gefixt (drie bugs, ontdekt doordat `check.sh` op een sinds 2026-05-19 idle `clamav-freshclam.service` bleef vlaggen)
+
+- **Daemon-laat-dood-achter bug** — `common/install-base.sh::freshclam_safe` stopt `clamav-freshclam.service` voordat het `freshclam` als oneshot draait, maar herstart de daemon niet. Sinds 2026-05-18 wordt deze helper ook door `av-update.timer` (04:00) gebruikt (voorheen alleen install-tijd). Effect: de eerste keer dat de timer vuurde stopte hij de daemon, die nooit meer aanging. Functioneel niet erg (signatures bleven vers via diezelfde timer-oneshot), maar wel een audit-irritant: ✗ in `check.sh`-output zonder dat er iets stuk was, plus stale runtime-state ("enabled but dead" daemon). Root cause: twee mechanismen voor één taak (long-running freshclam-daemon + oneshot-via-timer) die elkaars log-lock blokkeren. Fix: één mechanisme. `disable_freshclam_daemon` nieuwe helper in `install-base.sh`; `alma/install.sh`, `arch/install.sh`, `ubuntu/install.sh` roepen hem aan en laten `clamav-freshclam` weg uit `enable_clamav_services`. `clamav-scan.service` heeft `After=clamav-freshclam.service` niet meer (dependency op een ge-disable'd unit is misleidend; scan 02:00 vs update 04:00 conflicteren toch niet). `freshclam_safe` blijft bestaan als defensieve safety net voor gemigreerde installs en voor Ubuntu/Debian, waar debhelper-systemd de freshclam-service bij `apt install --reinstall clamav-daemon` opnieuw kan enable'n. Op Alma (upstream preset: `disabled`) en Arch (geen preset-mechanisme) is dat re-enable-scenario er niet — preset overleeft `dnf install`, `dnf reinstall` en `pacman -S` ongewijzigd.
+- **check.sh first-active-wins symmetrie** — comment in `common/lib.sh::WS_CLAMAV_DAEMON_CANDIDATES` zei *"eerste actieve wint in check.sh"*, maar de loop in `check.sh` iterateerde alle candidates en deed `((errors++))` op iedere inactieve. Op Alma stonden zowel `clamav-freshclam` als `clamd@scan` in `systemctl list-units`, dus alle twee werden geëvalueerd terwijl er maar één scan-daemon-actief-nodig is. Plus: `clamav-freshclam` is geen scan-daemon — het is de signature-updater die we niet meer gebruiken. Fix: `clamav-freshclam` uit `WS_CLAMAV_DAEMON_CANDIDATES` (alleen scan-daemons over: `clamd@scan`, `clamav-daemon`). `check.sh` loopt nu met early-break op de eerste actieve hit; maximaal 1 error uit deze sectie, comment en gedrag matchen.
+- **check.sh-samenvatting herhaalt nu welk probleem** — voorheen rapporteerde de eindregel alleen `"$errors probleem/problemen gevonden"` zonder te zeggen welke. Bij een cron-mail of sudo-screenshot moest een lezer terug-scrollen. Nieuwe `record_fail` / `record_warn` helpers vervangen de drie-regelige inline-pattern (ws_fail + ((errors++))), collect-en de messages in een `failures[]`-array, en aan het eind volgt een opsomming met `- <bericht>`-prefix (geen kleuren/iconen — sommige cron-MTAs trimmen die). Belangrijk voor audit-trail en troubleshooting-snelheid.
+
+#### Migratie-stap voor bestaande installs
+
+Eénmalig per machine (bestaande installs hebben `clamav-freshclam.service` nog als `enabled but inactive` staan; nieuwe installs via `bootstrap.sh` doen dit automatisch):
+
+```bash
+sudo systemctl daemon-reload                          # ruimt pending warning op
+sudo systemctl disable --now clamav-freshclam.service # weg uit enabled-set
+```
+
+Daarna brengt `bash check.sh` een schoon overzicht zonder de spurious freshclam-fail. Op Alma blijft hij daarna gegarandeerd uit (preset is `disabled`); op Ubuntu/Debian kan een handmatige `apt install --reinstall clamav-daemon` hem nog terugbrengen — herinstalleer in dat geval via `sudo bash ubuntu/install.sh`, die roept `disable_freshclam_daemon` opnieuw aan.
+
+### Merge-fix: arg-parsing extracted naar `ws_parse_install_args` helper
+
+#### Gewijzigd
+
+- `common/install-base.sh` — nieuwe `ws_parse_install_args` helper consolideert het `--dry-run` / `--version` / unknown-flag arg-parse pattern dat in `alma/install.sh`, `arch/install.sh` en `ubuntu/install.sh` als 17-regelige identieke block stond (jscpd flagged dit op `--threshold 0`). De 3 OS-installers vervangen die block met één call: `ws_parse_install_args "<script-hint>" "$@"`. Effect: één bron voor de arg-parse-conventie + repo-brede jscpd weer onder threshold.
+
+### Python support in `install-pm-cooldown.sh` (uv + pip)
+
+#### Toegevoegd
 - `install-pm-cooldown.sh` schrijft nu óók user-level config voor uv
   (`~/.config/uv/uv.toml` met `exclude-newer = "N days"`) en pip
   (`~/.config/pip/pip.conf` met `[install] uploaded-prior-to = PND`).
@@ -68,6 +115,8 @@ OpenSpec change: [`openspec/changes/archive/2026-05-18-v1-release-readiness/`](o
 - `common/install-pm-cooldown.sh` — `--dry-run` print de zou-toegepast-zijn upserts plus huidige staat ter referentie, raakt `~/.npmrc` en `~/.bunfig.toml` niet aan.
 - `common/incident-token-revoke.sh` — `SCRIPT_VERSION` leest nu uit het top-level `VERSION`-bestand (met `unknown`-fallback), in plaats van een hard-coded constant. Blijft self-contained (geen lib.sh-source).
 - `docs/README.md` — index-tabel uitgebreid met `supply-chain-cooldown.md`.
+
+## 2026-05-18 (avond) — Docs + review-fixes
 
 ### Toegevoegd
 - `docs/` directory met aanvullende documentatie naast hoofd-README. Drie files: `README.md` (index, hoe te gebruiken per audience), `compliance.md` (mapping van workstation-security componenten op control-IDs in vier frameworks: ISO 27001:2022 Annex A, SOC 2 Trust Services Criteria 2017 CC6/CC7/CC8/CC9, NEN 7510-2:2017, en BIO V1.04), en `threat-model.md` (in-scope/out-of-scope met expliciete reasoning en operating assumptions). Aanleiding: audit-evidence wordt sterker wanneer een auditor naar `docs/compliance.md#A.8.7` kan navigeren in plaats van scripts te moeten lezen. Eerste pass — control-mapping is geverifieerd tegen framework-hoofdsecties maar niet woord-voor-woord tegen de letterlijke control-tekst. Voor audit-ready scope: trim de doc tot de frameworks die voor die specifieke audit in scope zijn en valideer dáár woord-voor-woord.

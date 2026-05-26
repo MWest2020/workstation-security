@@ -13,16 +13,18 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly SCRIPT_DIR
 
-# shellcheck source=install-base.sh
+# shellcheck source=install-base.sh disable=SC1091
 source "${SCRIPT_DIR}/install-base.sh"
 
 ws_handle_version "$@"
 
 echo "==> ClamAV signatures bijwerken..."
-# freshclam_safe stopt eerst clamav-freshclam.service voordat het freshclam
-# zelf draait — anders race't deze update-timer (04:00) tegen de active
-# daemon die de log-lock vasthoudt en faalt de update silently. Audit-
-# relevant: een AV met stale signatures is een non-conformity.
+# freshclam_safe is een defensieve safety net: na een schone install van
+# deze repo staat clamav-freshclam.service uit (zie disable_freshclam_daemon
+# in install-base.sh) en is de `systemctl stop` een no-op. Maar op gemigreerde
+# installs of na een dnf/apt pakket-update kan de daemon alsnog aanstaan; dan
+# houdt hij de log-lock vast en faalt freshclam silently. Audit-relevant:
+# een AV met stale signatures is een non-conformity.
 freshclam_safe
 
 echo "==> rkhunter..."

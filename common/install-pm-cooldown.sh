@@ -36,7 +36,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly SCRIPT_DIR
 
-# shellcheck source=lib.sh
+# shellcheck source=lib.sh disable=SC1091
 source "${SCRIPT_DIR}/lib.sh"
 
 readonly NPMRC="${HOME}/.npmrc"
@@ -225,8 +225,8 @@ main() {
   local npm_days="$days"
   local pnpm_minutes=$((days * 24 * 60))
   local bun_seconds=$((days * 24 * 60 * 60))
-  local python_iso="P${days}D"      # ISO 8601 duration — pip uploaded-prior-to
-  local uv_friendly="${days} days"  # friendly relative duration — uv exclude-newer
+  local python_iso="P${days}D"     # ISO 8601 duration — pip uploaded-prior-to
+  local uv_friendly="${days} days" # friendly relative duration — uv exclude-newer
 
   if ws_is_dry_run; then
     echo "Would install ${days}-day package-manager cooldown:"

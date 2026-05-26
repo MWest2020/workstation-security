@@ -6,7 +6,7 @@
 
 Lichtgewicht baseline voor het hardenen van developer workstations. Bedoeld om de minimale set verdedigingen op orde te hebben die je voor een ISO 27001 / SOC 2 / NEN 7510 / BIO audit moet kunnen aantonen, zonder een full-blown EDR uit te rollen.
 
-Voor mappings naar specifieke control-IDs en het bedreigingsmodel: zie [`docs/`](docs/) — `compliance.md` voor de framework-mapping, `threat-model.md` voor wat we wel/niet verdedigen, `supply-chain-cooldown.md` voor de standalone uitleg van laag 2.
+Voor mappings naar specifieke control-IDs en het bedreigingsmodel: zie [`docs/`](docs/) — `compliance.md` voor de framework-mapping, `threat-model.md` voor wat we wel/niet verdedigen, `strategy.md` voor hoe de installer zich gedraagt bij een partial install (welke componenten required vs optional), en `supply-chain-cooldown.md` voor de standalone uitleg van laag 2.
 
 ## Doelgroep en scope
 
@@ -202,6 +202,7 @@ Dit verwijdert de systemd timers en logrotate config. ClamAV en rkhunter package
 |-----|----------|
 | [`docs/compliance.md`](docs/compliance.md) | Auditor, security officer, sales-ondersteuning — control-mapping naar ISO 27001 / SOC 2 / NEN 7510 / BIO. |
 | [`docs/threat-model.md`](docs/threat-model.md) | Implementatie-engineers, security-reviewers — wat we wel/niet verdedigen. |
+| [`docs/strategy.md`](docs/strategy.md) | Ops-engineers en nieuwe gebruikers — install-strategie, required vs optional componenten, partial-install-recovery. |
 | [`docs/supply-chain-cooldown.md`](docs/supply-chain-cooldown.md) | Devs die alleen laag 2 willen begrijpen of adopteren. |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Iedereen die een PR overweegt. |
 | [`openspec/`](openspec/) | Spec-driven changes — `proposal.md` + `tasks.md` + spec-deltas per change. |

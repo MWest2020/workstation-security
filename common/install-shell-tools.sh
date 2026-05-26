@@ -35,7 +35,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# shellcheck source=lib.sh
+# shellcheck source=lib.sh disable=SC1091
 source "${SCRIPT_DIR}/lib.sh"
 
 readonly LOCAL_BIN="${HOME}/.local/bin"
@@ -340,10 +340,12 @@ main() {
   # PATH sanity
   if ! echo ":$PATH:" | grep -q ":${LOCAL_BIN}:"; then
     ws_warn "${LOCAL_BIN} niet in PATH — voeg toe aan ~/.bashrc / ~/.zshrc:"
+    # shellcheck disable=SC2016  # literal-string is opzet: gebruiker copy-paste't dit
     ws_warn '    export PATH="$HOME/.local/bin:$PATH"'
   fi
   if ! echo ":$PATH:" | grep -q ":${NPM_GLOBAL}/bin:"; then
     ws_warn "${NPM_GLOBAL}/bin niet in PATH — voeg toe aan ~/.bashrc / ~/.zshrc:"
+    # shellcheck disable=SC2016  # literal-string is opzet: gebruiker copy-paste't dit
     ws_warn '    export PATH="$HOME/.npm-global/bin:$PATH"'
   fi
 

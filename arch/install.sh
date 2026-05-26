@@ -15,19 +15,7 @@ set -euo pipefail
 # shellcheck source=/dev/null
 source "$(dirname "$0")/../common/install-base.sh"
 
-ws_handle_version "$@"
-for arg in "$@"; do
-  case "$arg" in
-    --dry-run) export WS_DRY_RUN=1 ;;
-    *)
-      echo "error: onbekend argument: $arg" >&2
-      echo "       Geldige flags: --dry-run, --version/-V" >&2
-      exit 2
-      ;;
-  esac
-done
-
-require_root "arch/install.sh"
+ws_parse_install_args "arch/install.sh" "$@"
 
 clamav_ok=0
 rkhunter_ok=0
@@ -56,21 +44,28 @@ echo "==> Signatures downloaden..."
 freshclam_safe
 
 echo "==> Services aanzetten..."
-enable_clamav_services clamav-daemon clamav-freshclam
+# clamav-freshclam.service uit zetten — av-update.timer doet de signature-
+# update om 04:00; twee mechanismen race'n op de freshclam log-lock.
+disable_freshclam_daemon
+enable_clamav_services clamav-daemon
 
 echo "==> rkhunter installeren..."
+# Geen `2>/dev/null` op de echte run: pacman-failure-reasons willen we zien
+# (mirror onbereikbaar, package-conflict, etc.). De set +e-wrapper rond
+# rkhunter_init zit tegenwoordig in install-base.sh — rkhunter 1.4 +
+# deprecated egrep is rkhunter-quirk, niet Arch-specifiek.
 if ws_is_dry_run; then
   ws_run_or_print pacman -S --noconfirm rkhunter
   rkhunter_init
   rkhunter_ok=1
-elif pacman -S --noconfirm rkhunter 2>/dev/null; then
-  # Quirk: rkhunter in Arch gebruikt deprecated egrep en geeft non-zero exit
-  # bij --update; --propupd is wel betrouwbaar. set -e tijdelijk uit om
-  # vroegtijdig exit te voorkomen.
-  set +e
-  rkhunter_init
-  set -e
-  rkhunter_ok=1
+elif pacman -S --noconfirm rkhunter; then
+  if rkhunter_init; then
+    rkhunter_ok=1
+  else
+    echo "  rkhunter init kreeg non-zero exit (zie ws_warn hierboven)."
+    echo "  Controleer:  sudo ls -l /var/lib/rkhunter/db/rkhunter.dat"
+    echo "  Ontbreekt de .dat? Draai dan handmatig: sudo rkhunter --propupd"
+  fi
 else
   echo "  rkhunter niet beschikbaar via pacman — wordt overgeslagen."
 fi

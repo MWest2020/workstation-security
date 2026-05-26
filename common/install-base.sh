@@ -42,7 +42,12 @@ require_root() {
 }
 
 # freshclam draait niet als de daemon de log-lock vasthoudt — stop hem eerst.
-# Best-effort: faalt zonder error als de service niet bestaat.
+# Best-effort: faalt zonder error als de service niet bestaat. Sinds we
+# clamav-freshclam.service zelf niet meer enable'n (zie disable_freshclam_daemon
+# hieronder) is de stop-call op een verse install doorgaans een no-op, maar we
+# houden hem als defensieve safety net voor (a) gemigreerde installs en (b)
+# Ubuntu/Debian waar debhelper-systemd hem bij een `apt --reinstall` opnieuw
+# enable kan zetten.
 freshclam_safe() {
   if ws_is_dry_run; then
     ws_run_or_print systemctl stop clamav-freshclam
@@ -53,12 +58,88 @@ freshclam_safe() {
   freshclam
 }
 
-# rkhunter database update + propupd. Caller bepaalt zelf of een
-# distro-specifieke quirk een set +e/-e-wrapper nodig heeft (Arch ships een
-# rkhunter die op deprecated egrep een non-zero terugkomt — zie arch/install.sh).
+# Schakel clamav-freshclam.service uit als hij door pakket-install enabled
+# werd. Dit project gebruikt av-update.timer (04:00) als enige signature-
+# update mechanisme — twee concurrent mechanismen race'n op de freshclam
+# log-lock, en update.sh's `systemctl stop` voor freshclam_safe laat de
+# daemon permanent dood achter (de service wordt nooit herstart). Eén
+# mechanisme = boring & auditable.
+#
+# Re-enable risico per distro:
+#   Alma  — preset is `disabled`; dnf install/reinstall raakt 'm niet aan.
+#   Arch  — pacman draait geen preset; service is by default off.
+#   Ubuntu/Debian — debhelper-systemd postinst kan bij `apt install --reinstall`
+#                   van clamav-daemon de freshclam-service opnieuw enable'n;
+#                   deze functie corrigeert dat als de installer opnieuw
+#                   gedraaid wordt, en freshclam_safe (in update.sh) vangt
+#                   het dagelijks tijdelijk op met een stop voor freshclam.
+#
+# Idempotent: no-op als de service niet bestaat of al disabled is, en op
+# WSL zonder systemd.
+disable_freshclam_daemon() {
+  if ! ws_systemd_available; then
+    return 0
+  fi
+  systemctl disable --now clamav-freshclam 2>/dev/null || true
+}
+
+# rkhunter database update + property-database (re)bouwen. rkhunter 1.4.x
+# (huidig op Alma/Arch/Ubuntu) leunt intern op deprecated `egrep`; --update
+# kan daardoor met non-zero exit eindigen terwijl er functioneel niets fout
+# is. Onder `set -e` zou dat de erop volgende --propupd skippen, met als
+# resultaat een geïnstalleerde rkhunter zonder rkhunter.dat property-
+# database. `check.sh` faalt vervolgens permanent op "rkhunter database
+# niet gevonden". Daarom hier defensieve set +e/-e rond beide calls.
+#
+# Return-code: 0 als beide commands lukten, anders 1 (caller beslist of dat
+# tot rkhunter_ok=0 leidt of dat er een retry-hint geprint moet worden).
 rkhunter_init() {
-  ws_run_or_print rkhunter --update
-  ws_run_or_print rkhunter --propupd
+  if ws_is_dry_run; then
+    ws_run_or_print rkhunter --update
+    ws_run_or_print rkhunter --propupd
+    return 0
+  fi
+  local update_rc propupd_rc
+  set +e
+  rkhunter --update
+  update_rc=$?
+  rkhunter --propupd
+  propupd_rc=$?
+  set -e
+  if [[ $update_rc -ne 0 ]] || [[ $propupd_rc -ne 0 ]]; then
+    ws_warn "rkhunter init: --update rc=${update_rc} --propupd rc=${propupd_rc}"
+    return 1
+  fi
+  return 0
+}
+
+# Standaard arg-parsing voor OS-installers (alma/arch/ubuntu). Dekt:
+#   --version / -V         via ws_handle_version (exit'et zelf)
+#   --dry-run              zet WS_DRY_RUN=1 export
+#   onbekende flags        echo error + exit 2
+# Tot slot: require_root met de meegegeven script-hint (overgeslagen in
+# dry-run). Eerste arg is het script-pad voor de sudo-hint ("alma/install.sh"
+# etc.); resterende args zijn de originele "$@" van de caller.
+#
+# Reden voor consolidatie: pre-jscpd waren deze 17 regels identiek in alma/,
+# arch/ en ubuntu/install.sh (one source of truth voor de arg-conventie,
+# en de duplicate-detector klaagde terecht).
+ws_parse_install_args() {
+  local script_hint="$1"
+  shift
+  ws_handle_version "$@"
+  local arg
+  for arg in "$@"; do
+    case "$arg" in
+      --dry-run) export WS_DRY_RUN=1 ;;
+      *)
+        echo "error: onbekend argument: $arg" >&2
+        echo "       Geldige flags: --dry-run, --version/-V" >&2
+        exit 2
+        ;;
+    esac
+  done
+  require_root "$script_hint"
 }
 
 # Enable + start een lijst van clamav-gerelateerde services.

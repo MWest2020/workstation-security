@@ -17,7 +17,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 readonly SCRIPT_DIR
 
-# shellcheck source=common/lib.sh
+# shellcheck source=common/lib.sh disable=SC1091
 source "${SCRIPT_DIR}/common/lib.sh"
 
 # --version vóór de root-check zodat een gebruiker zonder sudo de versie kan

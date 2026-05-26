@@ -20,6 +20,28 @@ source "${SCRIPT_DIR}/common/lib.sh"
 ws_handle_version "$@"
 
 errors=0
+# Verzamel een korte beschrijving van iedere geconstateerde fout zodat de
+# samenvatting onderaan ze opsomt — handig voor cron-mail / audit-trail
+# (lezer hoeft niet terug te scrollen om de "1 probleem gevonden" te duiden).
+failures=()
+
+# Registreer een fail-conditie: print de regel via ws_fail, hou hem vast voor
+# de samenvatting en hoog de error-teller op. Vervangt de inline drie-regelige
+# pattern op iedere fail-call-site.
+record_fail() {
+  ws_fail "$1"
+  failures+=("$1")
+  ((errors++)) || true
+}
+
+# Identiek voor warn-condities die ook in het totaal meetellen (b.v. stale
+# signature/database). Visueel rendert ws_warn als `!`, maar voor de
+# audit-samenvatting is het gewoon een te-adresseren probleem.
+record_warn() {
+  ws_warn "$1"
+  failures+=("$1")
+  ((errors++)) || true
+}
 
 echo ""
 echo "=== workstation-security status ==="
@@ -37,19 +59,32 @@ if ws_systemd_available; then
   # zou geven dat door `pipefail` als pipeline-failure binnenkomt — false skip).
   units_output="$(systemctl list-units --full --all 2>/dev/null)"
 
-  # Detecteer welke ClamAV-service-naam actief is (Alma vs Arch vs Ubuntu).
+  # Detecteer welke ClamAV-scan-daemon actief is (Alma: clamd@scan;
+  # Arch/Ubuntu: clamav-daemon). First-active-wins: zodra een candidate
+  # actief is, klaar — andere candidates worden niet als fout gerapporteerd
+  # ook al staan ze loaded-but-inactive in list-units (b.v. omdat een vorig
+  # package-install ze ooit heeft opgestart). Maximaal 1 error uit deze sectie.
+  scan_daemon_active=""
+  scan_daemon_loaded=""
   for svc in "${WS_CLAMAV_DAEMON_CANDIDATES[@]}"; do
     if ! grep -qE "^${svc}\b|^  ${svc}" <<<"$units_output"; then
       continue
     fi
+    scan_daemon_loaded="$svc"
     status="$(systemctl is-active "$svc" 2>/dev/null || echo "inactive")"
     if [[ "$status" == "active" ]]; then
+      scan_daemon_active="$svc"
       ws_ok "$svc"
-    else
-      ws_fail "$svc (inactive)"
-      ((errors++)) || true
+      break
     fi
   done
+  if [[ -z "$scan_daemon_active" ]]; then
+    if [[ -n "$scan_daemon_loaded" ]]; then
+      record_fail "$scan_daemon_loaded (inactive)"
+    else
+      record_fail "geen ClamAV scan-daemon gevonden (clamd@scan / clamav-daemon)"
+    fi
+  fi
 
   echo ""
   echo "Timers:"
@@ -59,8 +94,7 @@ if ws_systemd_available; then
     if [[ "$status" == "active" ]]; then
       ws_ok "$timer"
     else
-      ws_fail "$timer (inactive)"
-      ((errors++)) || true
+      record_fail "$timer (inactive)"
     fi
   done
 else
@@ -86,12 +120,10 @@ if [[ -n "$sig_file" ]]; then
   if [[ $sig_age -le 3 ]]; then
     ws_ok "ClamAV signatures (${sig_age} dagen oud)"
   else
-    ws_warn "ClamAV signatures (${sig_age} dagen oud — voer 'sudo freshclam' uit)"
-    ((errors++)) || true
+    record_warn "ClamAV signatures (${sig_age} dagen oud — voer 'sudo freshclam' uit)"
   fi
 else
-  ws_fail "ClamAV signatures niet gevonden"
-  ((errors++)) || true
+  record_fail "ClamAV signatures niet gevonden"
 fi
 
 if command -v rkhunter &>/dev/null; then
@@ -100,14 +132,12 @@ if command -v rkhunter &>/dev/null; then
     if [[ $rk_age -le 3 ]]; then
       ws_ok "rkhunter database (${rk_age} dagen oud)"
     else
-      ws_warn "rkhunter database (${rk_age} dagen oud — voer 'sudo rkhunter --update' uit)"
-      ((errors++)) || true
+      record_warn "rkhunter database (${rk_age} dagen oud — voer 'sudo rkhunter --update' uit)"
     fi
   elif [[ $EUID -ne 0 ]] && [[ -d /var/lib/rkhunter ]]; then
     ws_warn "rkhunter database niet leesbaar (voer uit als root voor volledige check)"
   else
-    ws_fail "rkhunter database niet gevonden"
-    ((errors++)) || true
+    record_fail "rkhunter database niet gevonden (voer 'sudo rkhunter --propupd' uit)"
   fi
 else
   ws_skip "rkhunter niet geïnstalleerd (optioneel)"
@@ -139,7 +169,12 @@ if [[ $errors -eq 0 ]]; then
   echo "Alles in orde."
   exit 0
 else
-  echo "$errors probleem/problemen gevonden."
+  echo "$errors probleem/problemen gevonden:"
+  # Sommige cron-MTAs trimmen lege regels of indented output — gebruik een
+  # nuchter '- '-prefix zonder kleur/iconen zodat de lijst overleeft.
+  for f in "${failures[@]}"; do
+    printf '  - %s\n' "$f"
+  done
   # Cap exit-code op 2 — exit-codes boven 125 hebben in shell speciale betekenis.
   exit $((errors > 2 ? 2 : errors))
 fi

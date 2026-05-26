@@ -1,0 +1,10 @@
+{
+  "ignore": [
+    "report/**",
+    "openspec/changes/archive/**",
+    "node_modules/**",
+    "**/*.min.js",
+    "**/*.min.css"
+  ],
+  "gitignore": true
+}

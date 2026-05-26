@@ -6,21 +6,26 @@
 # Style-afwijking: shebang via `env bash` voor consistentie met repo.
 #
 # Usage:
-#   sudo bash alma/install.sh    # dnf install ClamAV + rkhunter, enable services, install timers
+#   sudo bash alma/install.sh             # dnf install ClamAV + rkhunter, enable services, install timers
+#   bash alma/install.sh --dry-run        # print zou-uitgevoerd-zijn commando's, geen wijzigingen
+#   bash alma/install.sh --version        # print versie en exit
 
 set -euo pipefail
 
 # shellcheck source=/dev/null
 source "$(dirname "$0")/../common/install-base.sh"
 
-require_root "alma/install.sh"
+ws_parse_install_args "alma/install.sh" "$@"
 
 clamav_ok=0
 rkhunter_ok=0
 
 echo "==> Packages installeren..."
-dnf install -y epel-release
-if dnf install -y clamav clamd clamav-update; then
+ws_run_or_print dnf install -y epel-release
+if ws_is_dry_run; then
+  ws_run_or_print dnf install -y clamav clamd clamav-update
+  clamav_ok=1
+elif dnf install -y clamav clamd clamav-update; then
   clamav_ok=1
 else
   echo "  FOUT: ClamAV installatie mislukt." >&2
@@ -28,9 +33,9 @@ else
 fi
 
 echo "==> ClamAV configureren..."
-sed -i 's/^Example/#Example/' /etc/clamd.d/scan.conf
-sed -i 's/^#LocalSocket /LocalSocket /' /etc/clamd.d/scan.conf
-sed -i 's/^Example/#Example/' /etc/freshclam.conf
+ws_run_or_print sed -i 's/^Example/#Example/' /etc/clamd.d/scan.conf
+ws_run_or_print sed -i 's/^#LocalSocket /LocalSocket /' /etc/clamd.d/scan.conf
+ws_run_or_print sed -i 's/^Example/#Example/' /etc/freshclam.conf
 
 echo "==> Signatures downloaden..."
 freshclam_safe
@@ -39,7 +44,9 @@ echo "==> SELinux boolean voor /home scans..."
 # Zonder deze boolean blokkeert SELinux clamscan (antivirus_exec_t) op /home,
 # resultaat: scan eindigt met 0 dirs / 0 files / status=2 INVALIDARGUMENT.
 if command -v setsebool >/dev/null 2>&1; then
-  setsebool -P antivirus_can_scan_system 1
+  ws_run_or_print setsebool -P antivirus_can_scan_system 1
+elif ws_is_dry_run; then
+  echo "  would run: setsebool -P antivirus_can_scan_system 1 (when SELinux beschikbaar)"
 fi
 
 echo "==> Services aanzetten..."
@@ -52,9 +59,15 @@ disable_freshclam_daemon
 enable_clamav_services clamd@scan
 
 echo "==> rkhunter installeren..."
-# Geen `2>/dev/null`: als dnf rkhunter niet kan installeren willen we de reden
-# zien (EPEL niet ingeschakeld, repo-fout, etc.) i.p.v. een silent skip.
-if dnf install -y rkhunter; then
+# Geen `2>/dev/null` op de echte run: als dnf rkhunter niet kan installeren
+# willen we de reden zien (EPEL niet ingeschakeld, repo-fout, etc.) i.p.v.
+# een silent skip. rkhunter_init wrapt zelf set +e/-e rond --update en
+# --propupd (rkhunter 1.4 + deprecated egrep — zie install-base.sh).
+if ws_is_dry_run; then
+  ws_run_or_print dnf install -y rkhunter
+  rkhunter_init
+  rkhunter_ok=1
+elif dnf install -y rkhunter; then
   if rkhunter_init; then
     rkhunter_ok=1
   else
@@ -69,6 +82,12 @@ fi
 
 echo "==> Timers installeren..."
 install_timers
+
+if ws_is_dry_run; then
+  echo ""
+  echo "(dry-run; no changes made)"
+  exit 0
+fi
 
 print_summary "$clamav_ok" "$rkhunter_ok" "dnf"
 

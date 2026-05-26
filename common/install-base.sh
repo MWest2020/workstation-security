@@ -28,8 +28,13 @@ readonly WS_BASE_DIR
 source "${WS_BASE_DIR}/lib.sh"
 
 # Vereist root; toont begeleidende sudo-hint met het pad van de caller.
+# Dry-run: skip de check — een gebruiker wil ook zonder sudo kunnen voorspellen
+# wat de installer zou doen (CI / audit-evidence).
 require_root() {
   local caller_hint="${1:-install.sh}"
+  if ws_is_dry_run; then
+    return 0
+  fi
   if [[ $EUID -ne 0 ]]; then
     echo "Run als root: sudo bash ${caller_hint}" >&2
     exit 1
@@ -44,6 +49,11 @@ require_root() {
 # Ubuntu/Debian waar debhelper-systemd hem bij een `apt --reinstall` opnieuw
 # enable kan zetten.
 freshclam_safe() {
+  if ws_is_dry_run; then
+    ws_run_or_print systemctl stop clamav-freshclam
+    ws_run_or_print freshclam
+    return 0
+  fi
   systemctl stop clamav-freshclam 2>/dev/null || true
   freshclam
 }
@@ -84,6 +94,11 @@ disable_freshclam_daemon() {
 # Return-code: 0 als beide commands lukten, anders 1 (caller beslist of dat
 # tot rkhunter_ok=0 leidt of dat er een retry-hint geprint moet worden).
 rkhunter_init() {
+  if ws_is_dry_run; then
+    ws_run_or_print rkhunter --update
+    ws_run_or_print rkhunter --propupd
+    return 0
+  fi
   local update_rc propupd_rc
   set +e
   rkhunter --update
@@ -98,11 +113,47 @@ rkhunter_init() {
   return 0
 }
 
+# Standaard arg-parsing voor OS-installers (alma/arch/ubuntu). Dekt:
+#   --version / -V         via ws_handle_version (exit'et zelf)
+#   --dry-run              zet WS_DRY_RUN=1 export
+#   onbekende flags        echo error + exit 2
+# Tot slot: require_root met de meegegeven script-hint (overgeslagen in
+# dry-run). Eerste arg is het script-pad voor de sudo-hint ("alma/install.sh"
+# etc.); resterende args zijn de originele "$@" van de caller.
+#
+# Reden voor consolidatie: pre-jscpd waren deze 17 regels identiek in alma/,
+# arch/ en ubuntu/install.sh (one source of truth voor de arg-conventie,
+# en de duplicate-detector klaagde terecht).
+ws_parse_install_args() {
+  local script_hint="$1"
+  shift
+  ws_handle_version "$@"
+  local arg
+  for arg in "$@"; do
+    case "$arg" in
+      --dry-run) export WS_DRY_RUN=1 ;;
+      *)
+        echo "error: onbekend argument: $arg" >&2
+        echo "       Geldige flags: --dry-run, --version/-V" >&2
+        exit 2
+        ;;
+    esac
+  done
+  require_root "$script_hint"
+}
+
 # Enable + start een lijst van clamav-gerelateerde services.
 # Op WSL zonder systemd-opt-in: warn + skip cleanly zodat de OS-installer
 # door kan gaan (packages staan al; daemon-runtime is optioneel — handmatige
 # scans blijven mogelijk). Aansluiting op de gate in install-timers.sh.
 enable_clamav_services() {
+  if ws_is_dry_run; then
+    local svc
+    for svc in "$@"; do
+      printf '  would run: systemctl enable --now %s\n' "$svc"
+    done
+    return 0
+  fi
   if ! ws_systemd_available; then
     if ws_is_wsl; then
       ws_warn "WSL zonder actieve systemd — ClamAV daemons niet enable'd."

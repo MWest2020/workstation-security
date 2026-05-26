@@ -13,8 +13,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly SCRIPT_DIR
 
-# shellcheck source=install-base.sh
+# shellcheck source=install-base.sh disable=SC1091
 source "${SCRIPT_DIR}/install-base.sh"
+
+ws_handle_version "$@"
 
 echo "==> ClamAV signatures bijwerken..."
 # freshclam_safe is een defensieve safety net: na een schone install van

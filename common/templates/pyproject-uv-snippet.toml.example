@@ -1,0 +1,16 @@
+# uv supply-chain cooldown — snippet to merge into your pyproject.toml.
+#
+# uv 0.9.17+ honors [tool.uv].exclude-newer at lock and install time. Friendly
+# relative durations ("7 days") are recomputed every run — effectively a
+# rolling cooldown window. For strict lockfile reproducibility, pin to an
+# explicit RFC 3339 timestamp instead (e.g. "2026-05-01T00:00:00Z").
+#
+# This is a SNIPPET — append/merge into your existing pyproject.toml, don't
+# overwrite it. If your project already has a [tool.uv] table, just add the
+# exclude-newer key inside it.
+#
+# Safe to commit. No secrets.
+
+[tool.uv]
+# Reject package versions younger than 7 days at install/lock time.
+exclude-newer = "7 days"

@@ -17,6 +17,8 @@ readonly SCRIPT_DIR
 # shellcheck source=/dev/null
 source "${SCRIPT_DIR}/common/lib.sh"
 
+ws_handle_version "$@"
+
 errors=0
 # Verzamel een korte beschrijving van iedere geconstateerde fout zodat de
 # samenvatting onderaan ze opsomt — handig voor cron-mail / audit-trail

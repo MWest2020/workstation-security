@@ -1,4 +1,4 @@
-name: ShellCheck
+name: shellcheck
 
 on: [push, pull_request]
 
@@ -11,3 +11,8 @@ jobs:
         uses: ludeeus/action-shellcheck@2.0.0
         with:
           scandir: '.'
+          # Match local pre-commit config (.pre-commit-config.yaml line 30):
+          # severity=warning. Filters SC1091 (un-followable source notes) en
+          # SC2016 (literal-$HOME in user-facing strings — bewust) die op
+          # default-style-niveau noise zijn.
+          severity: warning

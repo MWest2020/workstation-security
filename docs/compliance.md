@@ -54,7 +54,7 @@ Workstation-security raakt vooral A.8.
 | Control | Naam | Implementatie | Evidence |
 |---|---|---|---|
 | A.8.7 | Protection against malware | ClamAV (`scan.sh` dagelijks via timer) + rkhunter (`rkhunter-check.sh` dagelijks via timer). Daemon-mode via `clamd@scan` / `clamav-daemon`. Verkregen via per-OS installer (alma/arch/ubuntu). | `systemctl status clamav-scan.timer rkhunter-check.timer` + `/var/log/clamav/daily-scan.log` + `/var/log/rkhunter.log` |
-| A.8.8 | Management of technical vulnerabilities | (a) `common/update.sh` updates ClamAV signatures + rkhunter database dagelijks via `av-update.timer`. (b) `install-pm-cooldown.sh` configureert 7-daagse pakket-cooldown om malicious-package-attacks vóór ze landen. | `systemctl status av-update.timer` + `~/.npmrc` cooldown-keys + signature-timestamps via `check.sh` |
+| A.8.8 | Management of technical vulnerabilities | (a) `common/update.sh` updates ClamAV signatures + rkhunter database dagelijks via `av-update.timer`. (b) `install-pm-cooldown.sh` configureert 7-daagse pakket-cooldown om kwaadaardige supply-chain-uploads buiten lockfiles te houden. | `systemctl status av-update.timer` + `~/.npmrc` cooldown-keys + signature-timestamps via `check.sh` |
 | A.8.15 | Logging | Per-component logging naar `/var/log/clamav/*.log` en `/var/log/rkhunter.log`. Logrotate (`common/logrotate.conf`) rouleert wekelijks, 4 weken bewaard. CHANGELOG.md documenteert elke wijziging aan de tool zelf. | `ls -lah /var/log/clamav/` + `cat /etc/logrotate.d/workstation-security` + repo's CHANGELOG.md |
 | A.8.16 | Monitoring activities | `check.sh` als read-only audit-tool, exit-code = aantal problemen (cron/CI-bruikbaar). Verifieert services, timers, signature-leeftijd en laatste-scan-data. | `bash check.sh` output + exit-code |
 | A.8.19 | Installation of software on operational systems | npm/pnpm/bun cooldown via `install-pm-cooldown.sh` voorkomt installatie van pakketversies jonger dan N dagen. Werkstation-niveau (`~/.npmrc`) plus per-project templates (`common/templates/project-*`) voor CI. | `~/.npmrc`, `~/.bunfig.toml`, project-niveau `.npmrc` |
@@ -78,7 +78,7 @@ indirect via de pre-commit gate-philosophy.
 | Criterion | Verkorte tekst | Implementatie |
 |---|---|---|
 | CC6.6 | Implements logical access security ... including measures to ... mitigate the risks ... such as introduction of malicious software | ClamAV + rkhunter + cooldown — drie lagen tegen malware-introductie (zie A.8.7 / A.8.8 hierboven). |
-| CC6.8 | Implements controls to prevent or detect and act upon the introduction of unauthorized or malicious software | (a) ClamAV scan met wall-notificatie bij vondsten. (b) Pre-commit gitleaks vangt secrets. (c) Cooldown vangt malicious npm-uploads. (d) IR-script acteert op gedetecteerde token-compromise. |
+| CC6.8 | Implements controls to prevent or detect and act upon the introduction of unauthorized or malicious software | (a) ClamAV scan met wall-notificatie bij vondsten. (b) Pre-commit gitleaks vangt secrets. (c) Cooldown vangt kwaadaardige npm-uploads. (d) IR-script acteert op gedetecteerde token-compromise. |
 
 ### CC7 — System Operations
 
@@ -138,7 +138,7 @@ zijn de uitwerkingen, met B. de basismaatregelen.
 | Control | Naam | Implementatie |
 |---|---|---|
 | U.07.03 | Antimalware-software | ClamAV + rkhunter via systemd timers — automatische dagelijkse scans + signature-updates. |
-| U.09.04 | Patchmanagement | (a) `update.sh` daily voor AV-signatures. (b) `install-pm-cooldown.sh` voor pakket-cooldown — voorkomt installatie van te-vers/malicious packages. |
+| U.09.04 | Patchmanagement | (a) `update.sh` daily voor AV-signatures. (b) `install-pm-cooldown.sh` voor pakket-cooldown — voorkomt installatie van te-verse of kwaadaardige packages. |
 | U.14.01 | Beveiligd ontwikkelen | Pre-commit gates: shellcheck + shfmt + gitleaks + jscpd. Gate-philosophy (geen auto-fix) voorkomt stille divergence. |
 | U.16.01 | Beheer van logboeken | Per-component logs + logrotate 28-day retention. Auditeerbaar via `check.sh`. |
 | U.16.02 | Beveiligingsincidenten | `incident-token-revoke.sh` als specifieke incident-procedure. Algemener IR-beleid moet elders (organisatie-niveau, niet workstation-tool). |

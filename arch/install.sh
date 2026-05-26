@@ -6,14 +6,16 @@
 # Style-afwijking: shebang via `env bash` voor consistentie met repo.
 #
 # Usage:
-#   sudo bash arch/install.sh    # pacman -S ClamAV + rkhunter, enable services, install timers
+#   sudo bash arch/install.sh             # pacman -S ClamAV + rkhunter, enable services, install timers
+#   bash arch/install.sh --dry-run        # print zou-uitgevoerd-zijn commando's, geen wijzigingen
+#   bash arch/install.sh --version        # print versie en exit
 
 set -euo pipefail
 
 # shellcheck source=/dev/null
 source "$(dirname "$0")/../common/install-base.sh"
 
-require_root "arch/install.sh"
+ws_parse_install_args "arch/install.sh" "$@"
 
 clamav_ok=0
 rkhunter_ok=0
@@ -23,7 +25,10 @@ echo "==> Packages installeren..."
 # de package-database; geïnstalleerde packages blijven hun oude versie houden
 # en verse dependencies matchen niet meer. Arch-community behandelt dit
 # consistent als bug. Met --noconfirm gewoon meteen alles bijwerken.
-if pacman -Syu --noconfirm clamav; then
+if ws_is_dry_run; then
+  ws_run_or_print pacman -Syu --noconfirm clamav
+  clamav_ok=1
+elif pacman -Syu --noconfirm clamav; then
   clamav_ok=1
 else
   echo "  FOUT: ClamAV installatie mislukt." >&2
@@ -32,8 +37,8 @@ fi
 
 # Quirk: pacman maakt /var/lib/clamav niet altijd aan met juiste eigenaar.
 echo "==> ClamAV state-dir voorbereiden..."
-mkdir -p /var/lib/clamav
-chown clamav:clamav /var/lib/clamav
+ws_run_or_print mkdir -p /var/lib/clamav
+ws_run_or_print chown clamav:clamav /var/lib/clamav
 
 echo "==> Signatures downloaden..."
 freshclam_safe
@@ -45,11 +50,15 @@ disable_freshclam_daemon
 enable_clamav_services clamav-daemon
 
 echo "==> rkhunter installeren..."
-# Geen `2>/dev/null`: pacman-failure-reasons willen we zien (mirror onbereik-
-# baar, package-conflict, etc.). De set +e-wrapper rond rkhunter_init zit
-# tegenwoordig in install-base.sh — rkhunter 1.4 + deprecated egrep is
-# rkhunter-quirk, niet Arch-specifiek.
-if pacman -S --noconfirm rkhunter; then
+# Geen `2>/dev/null` op de echte run: pacman-failure-reasons willen we zien
+# (mirror onbereikbaar, package-conflict, etc.). De set +e-wrapper rond
+# rkhunter_init zit tegenwoordig in install-base.sh — rkhunter 1.4 +
+# deprecated egrep is rkhunter-quirk, niet Arch-specifiek.
+if ws_is_dry_run; then
+  ws_run_or_print pacman -S --noconfirm rkhunter
+  rkhunter_init
+  rkhunter_ok=1
+elif pacman -S --noconfirm rkhunter; then
   if rkhunter_init; then
     rkhunter_ok=1
   else
@@ -63,6 +72,12 @@ fi
 
 echo "==> Timers installeren..."
 install_timers
+
+if ws_is_dry_run; then
+  echo ""
+  echo "(dry-run; no changes made)"
+  exit 0
+fi
 
 print_summary "$clamav_ok" "$rkhunter_ok" "pacman"
 

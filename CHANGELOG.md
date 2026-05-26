@@ -1,17 +1,19 @@
 # Changelog
 
-## 2026-05-26 — rkhunter-init robuust + install-strategie expliciet gedocumenteerd
+## Unreleased
 
-### Toegevoegd
+### 2026-05-26 — rkhunter-init robuust + install-strategie expliciet gedocumenteerd
+
+#### Toegevoegd
 
 - `docs/strategy.md` — install-strategie expliciet beschreven. Aanleiding: tijdens een `sudo bash check.sh`-run kwam aan het licht dat rkhunter wél geïnstalleerd was (`rkhunter-1.4.6-31.el10_2.noarch` op Alma 10.1) maar de property-database `/var/lib/rkhunter/db/rkhunter.dat` ontbrak. De aanname dat rkhunter op Alma 10 "geskipt" werd klopte niet — een halve install met onduidelijk eindplaatje is een audit-irritant. De nieuwe doc beschrijft de best-effort-filosofie ("doe wat kan, meld wat niet, ga door"), per-component-status (required/optional), failure-modes, een per-OS×runtime-verwachtingsmatrix, en hoe `check.sh`-output te interpreteren bij een partial install. `docs/README.md` en hoofd-README linken er beide naar.
 
-### Gefixt
+#### Gefixt
 
-- `common/install-base.sh::rkhunter_init` — wrap `rkhunter --update` en `rkhunter --propupd` zelf onder `set +e`/`-e` en return een aparte status. Reden: rkhunter 1.4.x leunt intern op deprecated `egrep` en kan `--update` met non-zero exit eindigen zonder dat er functioneel iets fout is. Onder `set -euo pipefail` aborteerde dat de daaropvolgende `--propupd`, met als resultaat een geïnstalleerde rkhunter zonder `.dat` property-database — `check.sh` (als root) faalde permanent op "rkhunter database niet gevonden". De wrapper was tot nu toe alleen in `arch/install.sh` aanwezig met de motivering "Arch-specifieke quirk", maar het is rkhunter-1.4-specifiek, dus de wrapper hoort in de helper. `arch/install.sh` mag nu de eigen wrapper laten vallen.
-- `alma/install.sh`, `arch/install.sh`, `ubuntu/install.sh` — `dnf/pacman/apt install -y rkhunter 2>/dev/null` heeft de `2>/dev/null`-mute verloren. Pakket-install-foutmeldingen (EPEL niet ingeschakeld, mirror onbereikbaar, key verlopen, …) moet je kunnen zien; silent-skip-met-onbekende-reden is precies wat een audit niet wil. Bij een `rkhunter_init`-falen print de installer nu een retry-hint (`sudo rkhunter --propupd`) zodat een gebruiker de partial state in één commando kan repareren.
+- `common/install-base.sh::rkhunter_init` — wrap `rkhunter --update` en `rkhunter --propupd` zelf onder `set +e`/`-e` (in de real-run pad; dry-run blijft `ws_run_or_print`-based) en return een aparte status. Reden: rkhunter 1.4.x leunt intern op deprecated `egrep` en kan `--update` met non-zero exit eindigen zonder dat er functioneel iets fout is. Onder `set -euo pipefail` aborteerde dat de daaropvolgende `--propupd`, met als resultaat een geïnstalleerde rkhunter zonder `.dat` property-database — `check.sh` (als root) faalde permanent op "rkhunter database niet gevonden". De wrapper was tot nu toe alleen in `arch/install.sh` aanwezig met de motivering "Arch-specifieke quirk", maar het is rkhunter-1.4-specifiek, dus de wrapper hoort in de helper. `arch/install.sh` mag nu de eigen wrapper laten vallen.
+- `alma/install.sh`, `arch/install.sh`, `ubuntu/install.sh` — `dnf/pacman/apt install -y rkhunter 2>/dev/null` heeft de `2>/dev/null`-mute verloren op het real-run pad. Pakket-install-foutmeldingen (EPEL niet ingeschakeld, mirror onbereikbaar, key verlopen, …) moet je kunnen zien; silent-skip-met-onbekende-reden is precies wat een audit niet wil. Bij een `rkhunter_init`-falen print de installer nu een retry-hint (`sudo rkhunter --propupd`) zodat een gebruiker de partial state in één commando kan repareren. Dry-run-pad blijft `ws_run_or_print`-based.
 
-### Migratie-stap voor bestaande installs
+#### Migratie-stap voor bestaande installs
 
 Eénmalig (alleen waar `check.sh` als root ✗ rkhunter database niet gevonden meldt):
 
@@ -20,15 +22,15 @@ sudo rkhunter --propupd        # rebuild de property-database
 sudo bash check.sh             # verifieer: alles ✓
 ```
 
-## 2026-05-24 — Freshclam-daemon redundantie weg + check.sh first-active-wins symmetrie
+### 2026-05-24 — Freshclam-daemon redundantie weg + check.sh first-active-wins symmetrie + summary herhaalt welk probleem
 
-### Gefixt (twee bugs, ontdekt doordat `check.sh` op een sinds 2026-05-19 idle `clamav-freshclam.service` bleef vlaggen)
+#### Gefixt (drie bugs, ontdekt doordat `check.sh` op een sinds 2026-05-19 idle `clamav-freshclam.service` bleef vlaggen)
 
 - **Daemon-laat-dood-achter bug** — `common/install-base.sh::freshclam_safe` stopt `clamav-freshclam.service` voordat het `freshclam` als oneshot draait, maar herstart de daemon niet. Sinds 2026-05-18 wordt deze helper ook door `av-update.timer` (04:00) gebruikt (voorheen alleen install-tijd). Effect: de eerste keer dat de timer vuurde stopte hij de daemon, die nooit meer aanging. Functioneel niet erg (signatures bleven vers via diezelfde timer-oneshot), maar wel een audit-irritant: ✗ in `check.sh`-output zonder dat er iets stuk was, plus stale runtime-state ("enabled but dead" daemon). Root cause: twee mechanismen voor één taak (long-running freshclam-daemon + oneshot-via-timer) die elkaars log-lock blokkeren. Fix: één mechanisme. `disable_freshclam_daemon` nieuwe helper in `install-base.sh`; `alma/install.sh`, `arch/install.sh`, `ubuntu/install.sh` roepen hem aan en laten `clamav-freshclam` weg uit `enable_clamav_services`. `clamav-scan.service` heeft `After=clamav-freshclam.service` niet meer (dependency op een ge-disable'd unit is misleidend; scan 02:00 vs update 04:00 conflicteren toch niet). `freshclam_safe` blijft bestaan als defensieve safety net voor gemigreerde installs en voor Ubuntu/Debian, waar debhelper-systemd de freshclam-service bij `apt install --reinstall clamav-daemon` opnieuw kan enable'n. Op Alma (upstream preset: `disabled`) en Arch (geen preset-mechanisme) is dat re-enable-scenario er niet — preset overleeft `dnf install`, `dnf reinstall` en `pacman -S` ongewijzigd.
-
 - **check.sh first-active-wins symmetrie** — comment in `common/lib.sh::WS_CLAMAV_DAEMON_CANDIDATES` zei *"eerste actieve wint in check.sh"*, maar de loop in `check.sh` iterateerde alle candidates en deed `((errors++))` op iedere inactieve. Op Alma stonden zowel `clamav-freshclam` als `clamd@scan` in `systemctl list-units`, dus alle twee werden geëvalueerd terwijl er maar één scan-daemon-actief-nodig is. Plus: `clamav-freshclam` is geen scan-daemon — het is de signature-updater die we niet meer gebruiken. Fix: `clamav-freshclam` uit `WS_CLAMAV_DAEMON_CANDIDATES` (alleen scan-daemons over: `clamd@scan`, `clamav-daemon`). `check.sh` loopt nu met early-break op de eerste actieve hit; maximaal 1 error uit deze sectie, comment en gedrag matchen.
+- **check.sh-samenvatting herhaalt nu welk probleem** — voorheen rapporteerde de eindregel alleen `"$errors probleem/problemen gevonden"` zonder te zeggen welke. Bij een cron-mail of sudo-screenshot moest een lezer terug-scrollen. Nieuwe `record_fail` / `record_warn` helpers vervangen de drie-regelige inline-pattern (ws_fail + ((errors++))), collect-en de messages in een `failures[]`-array, en aan het eind volgt een opsomming met `- <bericht>`-prefix (geen kleuren/iconen — sommige cron-MTAs trimmen die). Belangrijk voor audit-trail en troubleshooting-snelheid.
 
-### Migratie-stap voor bestaande installs
+#### Migratie-stap voor bestaande installs
 
 Eénmalig per machine (bestaande installs hebben `clamav-freshclam.service` nog als `enabled but inactive` staan; nieuwe installs via `bootstrap.sh` doen dit automatisch):
 
@@ -38,6 +40,81 @@ sudo systemctl disable --now clamav-freshclam.service # weg uit enabled-set
 ```
 
 Daarna brengt `bash check.sh` een schoon overzicht zonder de spurious freshclam-fail. Op Alma blijft hij daarna gegarandeerd uit (preset is `disabled`); op Ubuntu/Debian kan een handmatige `apt install --reinstall clamav-daemon` hem nog terugbrengen — herinstalleer in dat geval via `sudo bash ubuntu/install.sh`, die roept `disable_freshclam_daemon` opnieuw aan.
+
+### Merge-fix: arg-parsing extracted naar `ws_parse_install_args` helper
+
+#### Gewijzigd
+
+- `common/install-base.sh` — nieuwe `ws_parse_install_args` helper consolideert het `--dry-run` / `--version` / unknown-flag arg-parse pattern dat in `alma/install.sh`, `arch/install.sh` en `ubuntu/install.sh` als 17-regelige identieke block stond (jscpd flagged dit op `--threshold 0`). De 3 OS-installers vervangen die block met één call: `ws_parse_install_args "<script-hint>" "$@"`. Effect: één bron voor de arg-parse-conventie + repo-brede jscpd weer onder threshold.
+
+### Python support in `install-pm-cooldown.sh` (uv + pip)
+
+#### Toegevoegd
+- `install-pm-cooldown.sh` schrijft nu óók user-level config voor uv
+  (`~/.config/uv/uv.toml` met `exclude-newer = "N days"`) en pip
+  (`~/.config/pip/pip.conf` met `[install] uploaded-prior-to = PND`).
+  Hetzelfde idempotente upsert-mechanisme als voor npm/pnpm/bun;
+  bestaande inhoud van die files (andere `[tool.uv]` settings, andere
+  pip-flags, etc.) blijft staan. `--check` en `--dry-run` tonen ook de
+  Python-keys.
+- `common/templates/pyproject-uv-snippet.toml.example` — snippet om
+  in een bestaande `pyproject.toml` te mergen (`[tool.uv].exclude-newer`).
+- `common/templates/project-pip.conf.example` — per-project pip.conf
+  voor projecten die `PIP_CONFIG_FILE=$PWD/pip.conf` in CI zetten.
+  Pip auto-detect't `pip.conf` niet zoals npm `.npmrc`, dus zonder
+  env-var-hop heeft het file-template geen effect.
+- `docs/supply-chain-cooldown.md` herschreven naar npm/pnpm/bun/uv/pip
+  coverage. Nieuwe incidenten: LiteLLM (maart 2026, 119k+ downloads in
+  2u32min) en Telnyx (april 2026). Externe primaire bronnen genoemd
+  (PyPI security blog, uv docs, pip docs, cooldowns.dev).
+- `common/templates/README.md` uitgebreid met Python-templates +
+  `UV_EXCLUDE_NEWER` / `PIP_UPLOADED_PRIOR_TO` env-vars voor CI-only
+  configuraties.
+
+### Gewijzigd
+- `upsert_bunfig()` in `install-pm-cooldown.sh` hernoemd naar
+  `upsert_section_kv()` en geparametriseerd (section + key + value).
+  Werkt nu voor zowel `bunfig.toml [install] minimumReleaseAge` als
+  `pip.conf [install] uploaded-prior-to`. Backward compatible — de
+  enige bestaande caller (bunfig) is meeverhuisd.
+- README sectie 2 + scope-tabel updaten naar de uitgebreide tool-set.
+
+### Gefixt
+- Taal-correctie in Nederlandstalige docs:
+  - "routineus" (calque van Engels "routine", betekent in NL juist
+    "uit gewoonte / mechanisch", niet "alledaags") → "bekend".
+  - "malicious" → "kwaadaardig" in Nederlandse zinnen.
+  - "quarantaineert" (lelijke verbed-noun) → "zet in quarantaine" /
+    "in quarantaine zetten".
+  Locaties: `docs/threat-model.md`, `docs/compliance.md`,
+  `docs/supply-chain-cooldown.md`, `README.md`. English-quoted
+  framework control-text (SOC 2 CC6.6, CC6.8, CC7.2) blijft als
+  citaat onveranderd; CHANGELOG-entries van v1.0.0 (gedateerd
+  2026-05-18) blijven historisch.
+
+## v1.0.0 (2026-05-18) — initial public release
+
+OpenSpec change: [`openspec/changes/archive/2026-05-18-v1-release-readiness/`](openspec/changes/archive/2026-05-18-v1-release-readiness/). Bundelde zeven kleine clusters (A2 + C1-C6) tot één coherent v1.0.0-leveringspakket. Gemerged via PR #2; tag plaatste op `d163653` (rebased tip van main na CI groen).
+
+### Toegevoegd
+- `VERSION`-file (top-level, semver `0.9.0`) als single source of truth voor versie. Helper `ws_version()` in `common/lib.sh` leest deze at-runtime; fallback `unknown` als de file ontbreekt (een script dat los gedownload werd faalt niet).
+- `--version` / `-V` flag op alle user-facing entrypoints: `bootstrap.sh`, `check.sh`, en elke `common/*.sh` met CLI (`install-pm-cooldown.sh`, `install-shell-tools.sh`, `incident-token-revoke.sh`, `scan.sh`, `rkhunter-check.sh`, `update.sh`, `uninstall.sh`). Werkt zonder sudo. Helper `ws_handle_version()` in `lib.sh` voor de scripts die lib.sh source'n; `incident-token-revoke.sh` houdt zijn self-contained inline-variant.
+- `--dry-run` flag op alle installers: `bootstrap.sh`, `alma/install.sh`, `arch/install.sh`, `ubuntu/install.sh`, `common/install-timers.sh`, `common/install-pm-cooldown.sh`. Geen side effects in dry-run; output copy-paste-baar naar een echte run. Flag propageert via `WS_DRY_RUN=1` env-var zodat dispatch-ketens 'm doorgeven (zie [`openspec/changes/v1-release-readiness/design.md`](openspec/changes/v1-release-readiness/design.md) D2). Helpers `ws_is_dry_run()` en `ws_run_or_print()` in `lib.sh`.
+- `docs/supply-chain-cooldown.md` — staat-op-zichzelf-doc voor laag 2: aanleiding (npm-incident 2026-05-11), mechanisme per package-manager met versie-vereisten, per-workstation vs per-project vs CI-scope-gap, override-flow voor urgente CVEs. README-sectie 2 verkort tot 3-4 zinnen + link.
+- `LICENSE` — volledige EUPL-1.2-tekst (van SPDX license-list-data, canoniek). Consistent met bestaande SPDX-headers per script.
+- `CONTRIBUTING.md` — project-status, "voor een goede PR", "welke PRs landen makkelijk/lastig", OpenSpec-workflow.
+- `.github/ISSUE_TEMPLATE/` — bug_report.md, distro_support.md, config.yml (`blank_issues_enabled: false`, met link naar README).
+- `.github/workflows/smoke.yml` — GitHub Actions smoke-test matrix (alma9, ubuntu2404, archlatest via officiële Docker Hub images). Draait `bootstrap.sh --version`, `bootstrap.sh --dry-run`, `check.sh`, en `install-pm-cooldown.sh --dry-run` op elke push/PR. Geen side effects op de runner.
+- OpenSpec scaffolding (`openspec/` directory) met de v1-release-readiness change (proposal, tasks, design, drie spec-deltas).
+
+### Gewijzigd
+- `README.md` — herstructureerd: badges bovenaan (smoke, license, shellcheck), doelgroep/scope gepromoveerd vóór de drie verdedigingslagen, elke laag eigen H2 met "wat", "voor wie", "snelle start", clone-URL gecorrigeerd naar `MWest2020/`, expliciete `## License`-sectie onderaan met EUPL-1.2-motivatie (digitale soevereiniteit, NLnet-context).
+- `bootstrap.sh` — source't `common/lib.sh` voor versioning/dry-run helpers, root-check overgeslagen in dry-run-modus (CI-bruikbaar zonder sudo).
+- `common/install-base.sh` — `require_root`, `freshclam_safe`, `rkhunter_init`, `enable_clamav_services` zijn nu dry-run-aware (printen wat ze zouden doen).
+- `common/install-timers.sh` — `ws_write_unit` wrapper rond elke `cat >file <<HEREDOC`; in dry-run print de unit-inhoud naar stdout in plaats van naar `/etc/systemd/system/`. Drift-smoke-test wordt overgeslagen in dry-run (zou false-failen).
+- `common/install-pm-cooldown.sh` — `--dry-run` print de zou-toegepast-zijn upserts plus huidige staat ter referentie, raakt `~/.npmrc` en `~/.bunfig.toml` niet aan.
+- `common/incident-token-revoke.sh` — `SCRIPT_VERSION` leest nu uit het top-level `VERSION`-bestand (met `unknown`-fallback), in plaats van een hard-coded constant. Blijft self-contained (geen lib.sh-source).
+- `docs/README.md` — index-tabel uitgebreid met `supply-chain-cooldown.md`.
 
 ## 2026-05-18 (avond) — Docs + review-fixes
 

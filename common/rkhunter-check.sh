@@ -15,8 +15,10 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly SCRIPT_DIR
 
-# shellcheck source=lib.sh
+# shellcheck source=lib.sh disable=SC1091
 source "${SCRIPT_DIR}/lib.sh"
+
+ws_handle_version "$@"
 
 LOG="/var/log/rkhunter.log"
 

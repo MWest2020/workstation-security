@@ -102,6 +102,15 @@ Description=ClamAV dagelijkse scan
 [Service]
 Type=oneshot
 ExecStart=/bin/bash $SCRIPT_DIR/scan.sh
+# Resource-limits — clamscan is single-threaded en zit standaard ~99%
+# op één core tijdens de 30+ min /home-scan. Op laptops geeft dat hoge temp,
+# stroomverbruik en hoorbare fans. Achtergrond-scan moet duren-maar-niet-
+# storen. Nice/IOSched/CPUQuota werken samen: CPU- én I/O-prioriteit laag,
+# plus harde cap op 50% van één core zodat een ander interactief proces
+# nooit volledig verdrongen wordt. Zie issue #3.
+Nice=19
+IOSchedulingClass=idle
+CPUQuota=50%
 UNIT
 
 ws_write_unit "$UNIT_DIR/clamav-scan.timer" <<'UNIT'

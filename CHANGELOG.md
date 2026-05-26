@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+### 2026-05-26 — Resource-limits op `clamav-scan.service` (issue #3)
+
+#### Gewijzigd
+
+- `common/install-timers.sh::clamav-scan.service` — drie systemd `[Service]`-directives toegevoegd: `Nice=19`, `IOSchedulingClass=idle`, `CPUQuota=50%`. Aanleiding: issue [#3](https://github.com/MWest2020/workstation-security/issues/3) van @SudoThijn. `clamscan` is single-threaded en zit standaard ~99% op één core tijdens de 30+ minuten durende `/home`-scan; op laptops geeft dat hoge temperatuur (70-80°C), stroomverbruik (~20W in de issue-reporter zijn meting) en hoorbare ventilatoren. De drie limits werken samen: CPU- en I/O-prioriteit zakken naar de allerlaagste klasse zodat interactieve processen altijd voorgaan, plus een harde cap op 50% van één core zodat clamscan een interactief proces nooit volledig kan verdringen. Scan duurt in kloktijd langer; verstoort niet meer waar je mee bezig bent — voor een achtergrond-scan de juiste afweging.
+
+#### Migratie-stap voor bestaande installs
+
+Een lopende `clamav-scan.service` neemt de nieuwe limits niet vanzelf over — de unit file wordt door `install-timers.sh` op disk gezet, maar systemd cached de eerder geladen versie tot een reload.
+
+```bash
+sudo bash common/install-timers.sh   # herschrijft clamav-scan.service met nieuwe limits
+sudo systemctl daemon-reload         # reload de unit files
+# (geen herstart van de service nodig — clamav-scan is een oneshot,
+#  draait om 02:00 met de nieuwe limits)
+```
+
+Verifieer met `systemctl show clamav-scan.service -p Nice -p IOSchedulingClass -p CPUQuotaPerSecUSec` na de reload.
+
 ### 2026-05-26 — rkhunter-init robuust + install-strategie expliciet gedocumenteerd
 
 #### Toegevoegd

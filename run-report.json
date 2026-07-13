@@ -1,13 +1,13 @@
 {
-  "role": "builder",
+  "role": "reviewer",
   "change": "apply-docs-contract",
-  "run_id": "builder-apply-docs-contract-20260713-072543",
+  "run_id": "reviewer-apply-docs-contract-20260713-073229",
   "repo": "https://github.com/MWest2020/workstation-security.git",
   "verdict": "ok",
   "subtype": "success",
-  "total_cost_usd": "1.9634605",
-  "num_turns": "29",
+  "total_cost_usd": "0.7169215",
+  "num_turns": "15",
   "claude_exit": "0",
-  "finished_at": "2026-07-13T07:32:24Z",
-  "diff_hash": "ad50d056b972d3fffb19a609f47187dfec875bc820466294e70b206a6efdaf0e"
+  "finished_at": "2026-07-13T07:34:36Z",
+  "diff_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 }

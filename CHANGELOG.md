@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### 2026-08-03 — Laag 4: agent-guardrails voor Claude Code
+
+#### Toegevoegd
+
+- `common/templates/claude-deny-secrets.json` — canonieke secret-denylist voor `~/.claude/settings.json`. Aanleiding: bij het starten van een Claude Code-sessie waarschuwde de CLI dat zes deny-regels van de vorm `Write(**/.env)` / `Write(/**/*.pem)` niet meegenomen worden in de file-permissiecheck. Alleen `Edit(...)` matcht daar — dat patroon dekt Edit, Write én NotebookEdit. De zes regels stonden er dus wel, maar blokkeerden niets: schrijven naar `.env`, `*.pem`, `*.key`, `*_rsa` en `*.crt` leunde in de praktijk alleen op prozaregels in `CLAUDE.md`. Een denylist die schijnveiligheid geeft is erger dan geen denylist, want hij stopt het zoeken.
+- `common/check-claude-guardrails.sh` (`role: tool`, read-only) — verifieert dat elke canonieke regel letterlijk in de live settings staat, en rapporteert daarnaast élke resterende `Write(...)`-regel als *dode regel*. Exit-code 0/1/2 conform `check.sh`; ontbrekende `jq` of onleesbare settings geeft óók 2, want "kon niet verifiëren" mag in een audit nooit als "in orde" langskomen. Getest tegen zowel de live settings (alles groen) als een fixture met een ontbrekende regel plus een dode `Write(...)` (exit 2, beide bevindingen gemeld).
+- `docs/explanation/claude-code-guardrails.md` — afwegingen achter de regelset, plus expliciet wat deze laag níét afdekt: shell-commando's vallen onder Bash-regels (niet onder file-permissies), `kubectl get` blijft werken met een geblokkeerde `~/.kube/` omdat kubectl zijn config als proces leest, en proza in `CLAUDE.md` is beleid en geen handhaving.
+
+De doc volgt de handbook-docs-contract die op 2026-07-13 op `main` landde: onder `docs/explanation/`, met front-matter (`status`, `last_reviewed`) en in het Engels zoals de andere pagina's daar; `docs/index.md` verwijst ernaar. README en CHANGELOG blijven Nederlands, conform de rest van de repo.
+
+#### Gewijzigd
+
+- `README.md` — "Drie verdedigingslagen" is nu vier; laag 4 beschreven met snelle start, en opgenomen in de intro-paragraaf en de "Verder lezen"-tabel.
+- Classificatie van bestandstypen aangescherpt t.o.v. de oude lijst: `*.crt` en `*.csr` zijn publiek per definitie en staan bewust **niet** meer in de denylist — blokkeren daarvan levert alleen frictie op. `*.pem` is asymmetrisch: lezen mag (vaak een cert chain), schrijven niet (kan een private key zijn; de extensie zegt niets over de inhoud). `.env*`, `*.key`, `*_rsa` en de vier credential-stores blijven dicht voor zowel lezen als schrijven.
+
 ### 2026-05-26 — Resource-limits op `clamav-scan.service` (issue #3)
 
 #### Gewijzigd

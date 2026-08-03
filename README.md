@@ -6,7 +6,7 @@
 
 Lichtgewicht baseline voor het hardenen van developer workstations. Bedoeld om de minimale set verdedigingen op orde te hebben die je voor een ISO 27001 / SOC 2 / NEN 7510 / BIO audit moet kunnen aantonen, zonder een full-blown EDR uit te rollen.
 
-Voor mappings naar specifieke control-IDs en het bedreigingsmodel: zie [`docs/`](docs/) — `compliance.md` voor de framework-mapping, `threat-model.md` voor wat we wel/niet verdedigen, `strategy.md` voor hoe de installer zich gedraagt bij een partial install (welke componenten required vs optional), en `supply-chain-cooldown.md` voor de standalone uitleg van laag 2.
+Voor mappings naar specifieke control-IDs en het bedreigingsmodel: zie [`docs/`](docs/) — `compliance.md` voor de framework-mapping, `threat-model.md` voor wat we wel/niet verdedigen, `strategy.md` voor hoe de installer zich gedraagt bij een partial install (welke componenten required vs optional), `supply-chain-cooldown.md` voor de standalone uitleg van laag 2, en `claude-code-guardrails.md` voor laag 4 (agent-guardrails).
 
 ## Doelgroep en scope
 
@@ -14,9 +14,9 @@ Voor mappings naar specifieke control-IDs en het bedreigingsmodel: zie [`docs/`]
 - Target distros: Alma / Rocky / RHEL / Fedora / CentOS (dnf), Arch / Manjaro / EndeavourOS (pacman), Ubuntu / Debian / Mint / Pop / Raspbian (apt). macOS wordt deels ondersteund — het IR-script werkt cross-platform.
 - WSL2 (Windows Subsystem for Linux) is detecteerbaar en wordt netjes afgehandeld — scripts skippen systemd-features waar nodig in plaats van hard te falen. Zie [WSL Support](#wsl-support) onderaan.
 
-## Drie verdedigingslagen
+## Vier verdedigingslagen
 
-Elk standalone te begrijpen en in te zetten. Je kunt 1, 2 en 3 los gebruiken — `bootstrap.sh` rolt 1 uit (de andere zijn aparte invocations).
+Elk standalone te begrijpen en in te zetten. Je kunt 1 t/m 4 los gebruiken — `bootstrap.sh` rolt 1 uit (de andere zijn aparte invocations).
 
 ### 1. Antivirus + rootkit
 
@@ -67,6 +67,20 @@ bash common/incident-token-revoke.sh             # volledige flow
 ```
 
 User-level (geen root nodig). Schone runs laten niks achter op disk; alleen bij findings wordt `/tmp/incident-<ts>/` aangemaakt. Voor optionele mail-rapportage via SMTPS zie de "Optionele mail-rapportage"-sectie verderop.
+
+### 4. Agent-guardrails — secrets afschermen voor Claude Code
+
+**Wat:** read-only audit van de secret-denylist in `~/.claude/settings.json`. Verifieert dat `.env`, private keys en credential-stores (`~/.ssh/`, `~/.kube/`, `~/.aws/`, `~/.gnupg/`) technisch geblokkeerd zijn voor de agent, en spoort *dode* regels op — een `Write(...)`-patroon dat eruitziet als bescherming maar door Claude Code genegeerd wordt (alleen `Edit(...)` matcht op file-permissies).
+
+**Voor wie:** iedereen die een agent-CLI met filesystem-toegang op een werkmachine draait. De canonieke regelset staat in `common/templates/claude-deny-secrets.json`; publiek materiaal (`*.crt`, `*.csr`, en `*.pem` bij lezen) blijft bewust toegankelijk.
+
+**Snelle start:**
+```bash
+bash common/check-claude-guardrails.sh                          # audit huidige user
+bash common/check-claude-guardrails.sh --settings /pad/naar.json  # andere settings-file
+```
+
+User-level, read-only, installeert niets — exit-code 0/1/2 net als `check.sh`. Voor de afwegingen (waarom `.pem` wél lezen, wat deze laag níét afdekt) zie [`docs/explanation/claude-code-guardrails.md`](docs/explanation/claude-code-guardrails.md).
 
 ## Installatie
 
@@ -204,6 +218,7 @@ Dit verwijdert de systemd timers en logrotate config. ClamAV en rkhunter package
 | [`docs/threat-model.md`](docs/threat-model.md) | Implementatie-engineers, security-reviewers — wat we wel/niet verdedigen. |
 | [`docs/strategy.md`](docs/strategy.md) | Ops-engineers en nieuwe gebruikers — install-strategie, required vs optional componenten, partial-install-recovery. |
 | [`docs/supply-chain-cooldown.md`](docs/supply-chain-cooldown.md) | Devs die alleen laag 2 willen begrijpen of adopteren. |
+| [`docs/explanation/claude-code-guardrails.md`](docs/explanation/claude-code-guardrails.md) | Devs die een agent-CLI met filesystem-toegang draaien — laag 4, inclusief wat die laag níét afdekt. |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Iedereen die een PR overweegt. |
 | [`openspec/`](openspec/) | Spec-driven changes — `proposal.md` + `tasks.md` + spec-deltas per change. |
 

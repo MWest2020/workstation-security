@@ -78,6 +78,7 @@ User-level (geen root nodig). Schone runs laten niks achter op disk; alleen bij 
 ```bash
 bash common/check-claude-guardrails.sh                          # audit huidige user
 bash common/claude-pre-tool-use.sh --self-test                  # 21 fixtures door de hook
+bash common/check-claude-guardrails.sh --self-test              # 7 fixtures door de checker
 bash common/check-claude-guardrails.sh --settings /pad/naar.json  # andere settings-file
 ```
 

@@ -31,6 +31,7 @@
 #   bash common/check-claude-guardrails.sh                          # audit huidige user
 #   bash common/check-claude-guardrails.sh --settings /pad/naar.json  # andere settings-file
 #   bash common/check-claude-guardrails.sh --rules /pad/regels.json   # eigen regelset
+#   bash common/check-claude-guardrails.sh --self-test                # test de checker zelf tegen fixtures
 #   bash common/check-claude-guardrails.sh --version                  # print versie en exit
 #
 # Exit-codes: 0 = alles in orde, 1 = één probleem, 2 = twee of meer problemen,
@@ -96,13 +97,19 @@ parse_args() {
   done
 }
 
-# Harde randvoorwaarden. Bewust exit 2 in plaats van een skip: "kon niet
-# verifiëren" mag in een audit nooit als "in orde" gerapporteerd worden.
-check_prerequisites() {
+# jq is de enige harde eis van de self-test: die fabriceert zijn eigen settings
+# en heeft dus geen live ~/.claude nodig.
+require_jq() {
   if ! command -v jq &>/dev/null; then
     ws_fail "jq niet gevonden — kan settings niet verifiëren"
     exit 2
   fi
+}
+
+# Harde randvoorwaarden. Bewust exit 2 in plaats van een skip: "kon niet
+# verifiëren" mag in een audit nooit als "in orde" gerapporteerd worden.
+check_prerequisites() {
+  require_jq
   if [[ ! -r "$settings_file" ]]; then
     ws_fail "settings niet leesbaar: ${settings_file}"
     exit 2
@@ -181,8 +188,73 @@ check_hook_registration() {
   ws_ok "PreToolUse-hook actief en identiek aan repo-versie"
 }
 
+# --- self-test --------------------------------------------------------------
+
+# Black-box: elke case draait dit script opnieuw tegen een gefabriceerde
+# settings-file en toetst exit-code én melding. Fixtures worden afgeleid van de
+# echte regelset, zodat de test meebeweegt als die lijst verandert — een test
+# met een eigen kopie van de regels test alleen zichzelf.
+#
+# De 'alles in orde'-case staat er bewust bij: een checker die overal een
+# probleem ziet is net zo waardeloos als een die nooit iets ziet.
+run_self_test() {
+  local tmp repo_hook failed=0
+  tmp="$(mktemp -d)"
+  # shellcheck disable=SC2064  # $tmp nu expanderen, niet bij trap-executie
+  trap "rm -rf '${tmp}'" EXIT
+  repo_hook="${SCRIPT_DIR}/claude-pre-tool-use.sh"
+
+  # Basis: alle canonieke regels aanwezig, hook geregistreerd op het repo-pad.
+  jq --arg hook "$repo_hook" \
+    '{permissions: {deny: .deny}, hooks: {PreToolUse: [{matcher: "", hooks: [{type: "command", command: $hook}]}]}}' \
+    "$rules_file" >"${tmp}/ok.json"
+
+  jq 'del(.permissions.deny[0])' "${tmp}/ok.json" >"${tmp}/missing-rule.json"
+  jq '.permissions.deny += ["Write(**/.env)"]' "${tmp}/ok.json" >"${tmp}/dead-write.json"
+  jq 'del(.hooks)' "${tmp}/ok.json" >"${tmp}/no-hook.json"
+  jq '.hooks.PreToolUse[0].hooks[0].command = "/bin/true"' "${tmp}/ok.json" >"${tmp}/other-hook.json"
+  printf 'dit is geen json\n' >"${tmp}/broken.json"
+
+  assert_case() {
+    local name="$1" settings="$2" want_rc="$3" want_text="$4"
+    local out rc=0
+    out="$(bash "${BASH_SOURCE[0]}" --settings "$settings" 2>&1)" || rc=$?
+    if [[ "$rc" == "$want_rc" ]] && grep -qF "$want_text" <<<"$out"; then
+      ws_ok "$name"
+      return 0
+    fi
+    ws_fail "${name} — verwacht exit ${want_rc} + '${want_text}', kreeg exit ${rc}"
+    ((failed++)) || true
+  }
+
+  assert_case "volledige settings" "${tmp}/ok.json" 0 "Alles in orde"
+  assert_case "ontbrekende regel" "${tmp}/missing-rule.json" 1 "ontbreekt:"
+  assert_case "dode Write-regel" "${tmp}/dead-write.json" 1 "dode regel"
+  assert_case "geen hook geregistreerd" "${tmp}/no-hook.json" 1 "geen PreToolUse-hook"
+  assert_case "andere hook geregistreerd" "${tmp}/other-hook.json" 1 "niet common/claude-pre-tool-use.sh"
+  assert_case "kapotte settings" "${tmp}/broken.json" 2 "geen valide JSON"
+  assert_case "settings ontbreekt" "${tmp}/bestaat-niet.json" 2 "niet leesbaar"
+
+  echo ""
+  if ((failed == 0)); then
+    echo "self-test: 7/7 fixtures correct."
+    return 0
+  fi
+  echo "self-test: ${failed} van 7 fixtures fout." >&2
+  return 1
+}
+
 main() {
   ws_handle_version "$@"
+
+  if [[ "${1:-}" == "--self-test" ]]; then
+    require_jq
+    echo ""
+    echo "=== check-claude-guardrails self-test ==="
+    echo ""
+    run_self_test
+    exit $?
+  fi
   parse_args "$@"
   check_prerequisites
 

@@ -67,4 +67,8 @@ jobs:
               # netwerk, geen side effects. Faalt hard — een guardrail die de
               # verkeerde kant op beslist is een defect, geen warning.
               bash common/claude-pre-tool-use.sh --self-test
+              echo
+              echo "=== check-claude-guardrails.sh --self-test ==="
+              # Fabriceert zijn eigen settings-fixtures; heeft geen ~/.claude nodig.
+              bash common/check-claude-guardrails.sh --self-test
             '

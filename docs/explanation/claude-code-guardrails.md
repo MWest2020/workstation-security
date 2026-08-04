@@ -100,7 +100,12 @@ Wire it up in `~/.claude/settings.json`:
 same decision function a live call takes — both directions, because a hook that
 blocks everything is as broken as one that blocks nothing.
 `check-claude-guardrails.sh` reports whether the hook is registered at all and
-whether the registered copy still matches the one in this repository.
+whether the registered copy still matches the one in this repository. It has a
+`--self-test` of its own: seven fabricated settings files (complete, missing a
+rule, a dead `Write(...)`, no hook, a foreign hook, invalid JSON, absent file)
+run through the real script, asserting both exit code and message. The fixtures
+are derived from the canonical rule set, so the test moves with that list
+instead of testing a private copy of it. Both self-tests run in CI.
 
 ## What this layer does *not* cover
 
@@ -131,6 +136,7 @@ is worse than both being wrong — then the reader believes the wrong half.
     bash common/check-claude-guardrails.sh --settings /path/x.json  # a different settings file
     bash common/check-claude-guardrails.sh --rules /path/r.json     # your own rule set
     bash common/claude-pre-tool-use.sh --self-test                  # verify the hook's decisions
+    bash common/check-claude-guardrails.sh --self-test              # verify the checker's own findings
 
 Exit code 0 means fine, 1 means one problem, 2 means two or more (capped, so
 cron/CI can work with it). A missing `jq` or an unreadable settings file also

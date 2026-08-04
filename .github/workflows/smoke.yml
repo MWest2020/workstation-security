@@ -61,4 +61,10 @@ jobs:
               echo
               echo "=== install-pm-cooldown.sh --dry-run ==="
               bash common/install-pm-cooldown.sh --dry-run
+              echo
+              echo "=== claude-pre-tool-use.sh --self-test ==="
+              # Zuivere logica-test op de hook-beslissingen: geen settings, geen
+              # netwerk, geen side effects. Faalt hard — een guardrail die de
+              # verkeerde kant op beslist is een defect, geen warning.
+              bash common/claude-pre-tool-use.sh --self-test
             '

@@ -13,12 +13,15 @@
 # de enige technische rem daarop; prozaregels in CLAUDE.md zijn beleid, geen
 # handhaving. Dit script controleert of die rem daadwerkelijk aan staat.
 #
-# Twee soorten bevindingen:
+# Drie soorten bevindingen:
 #   1. Ontbrekende regel — een canonieke deny uit de rules-file staat niet in
 #      de live settings. Secret-materiaal is dan niet afgeschermd.
 #   2. Dode regel — een `Write(...)`-patroon in de denylist. Claude Code matcht
 #      file-permissies alleen op `Edit(...)`; een Write-regel wordt genegeerd
 #      en geeft dus schijnveiligheid. Dit is de reden dat dit script bestaat.
+#   3. Ontbrekende shell-laag — de denylist geldt voor de Read/Edit-tools, niet
+#      voor `cat ~/.env` in een Bash-call. Daarvoor moet
+#      common/claude-pre-tool-use.sh als PreToolUse-hook geregistreerd staan.
 #
 # Writes: read-only (leest settings + rules-file, schrijft niets)
 # Idempotent: ja (read-only)
@@ -54,6 +57,14 @@ failures=()
 # de teller op. Zelfde pattern als check.sh zodat de output-vorm herkenbaar is.
 record_fail() {
   ws_fail "$1"
+  failures+=("$1")
+  ((errors++)) || true
+}
+
+# Idem voor condities die niet fout-maar-wel-te-adresseren zijn (b.v. een
+# afwijkende hook-kopie). Rendert als `!`, telt wel mee in het totaal.
+record_warn() {
+  ws_warn "$1"
   failures+=("$1")
   ((errors++)) || true
 }
@@ -136,6 +147,40 @@ check_dead_write_rules() {
   done <<<"$dead"
 }
 
+# De denylist dekt de Read/Edit-tools; shell-calls (`cat ~/.env`) glippen daar
+# onderdoor. Dat gat wordt gedicht door common/claude-pre-tool-use.sh, maar
+# alleen als die hook ook echt geregistreerd staat. Drie uitkomsten: niet
+# geregistreerd (fout), geregistreerd maar een afwijkende kopie (waarschuwing —
+# kan bewuste uitbreiding zijn), of geregistreerd en identiek.
+check_hook_registration() {
+  local repo_hook="${SCRIPT_DIR}/claude-pre-tool-use.sh"
+  local registered hook_path
+  registered="$(jq -r '[.hooks.PreToolUse[]?.hooks[]?.command // empty] | .[]' "$settings_file")"
+
+  if [[ -z "$registered" ]]; then
+    record_fail "geen PreToolUse-hook geregistreerd — shell-calls naar secrets zijn niet afgeschermd"
+    return 0
+  fi
+
+  hook_path="$(grep -F 'claude-pre-tool-use.sh' <<<"$registered" | head -1 || true)"
+  if [[ -z "$hook_path" ]]; then
+    record_fail "PreToolUse-hook(s) geregistreerd, maar niet common/claude-pre-tool-use.sh — shell-calls naar secrets zijn niet afgeschermd"
+    return 0
+  fi
+
+  if [[ ! -r "$hook_path" ]]; then
+    record_fail "geregistreerde hook niet leesbaar: ${hook_path}"
+    return 0
+  fi
+
+  if ! cmp -s "$hook_path" "$repo_hook"; then
+    record_warn "geregistreerde hook wijkt af van de repo-versie: ${hook_path}"
+    return 0
+  fi
+
+  ws_ok "PreToolUse-hook actief en identiek aan repo-versie"
+}
+
 main() {
   ws_handle_version "$@"
   parse_args "$@"
@@ -151,6 +196,10 @@ main() {
 
   check_required_rules
   check_dead_write_rules
+
+  echo ""
+  echo "Shell-laag:"
+  check_hook_registration
 
   echo ""
   if [[ $errors -eq 0 ]]; then

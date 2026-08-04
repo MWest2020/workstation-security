@@ -70,17 +70,18 @@ User-level (geen root nodig). Schone runs laten niks achter op disk; alleen bij 
 
 ### 4. Agent-guardrails — secrets afschermen voor Claude Code
 
-**Wat:** read-only audit van de secret-denylist in `~/.claude/settings.json`. Verifieert dat `.env`, private keys en credential-stores (`~/.ssh/`, `~/.kube/`, `~/.aws/`, `~/.gnupg/`) technisch geblokkeerd zijn voor de agent, en spoort *dode* regels op — een `Write(...)`-patroon dat eruitziet als bescherming maar door Claude Code genegeerd wordt (alleen `Edit(...)` matcht op file-permissies).
+**Wat:** twee sloten plus een audit. De denylist in `~/.claude/settings.json` schermt `.env`, private keys en credential-stores (`~/.ssh/`, `~/.kube/`, `~/.aws/`, `~/.gnupg/`) af voor de file-tools; de `PreToolUse`-hook `common/claude-pre-tool-use.sh` doet hetzelfde voor shell-calls (`cat ~/.env` glipt anders onder de denylist door). `common/check-claude-guardrails.sh` controleert of beide er daadwerkelijk staan, en spoort *dode* regels op — een `Write(...)`-patroon dat eruitziet als bescherming maar door Claude Code genegeerd wordt (alleen `Edit(...)` matcht op file-permissies).
 
-**Voor wie:** iedereen die een agent-CLI met filesystem-toegang op een werkmachine draait. De canonieke regelset staat in `common/templates/claude-deny-secrets.json`; publiek materiaal (`*.crt`, `*.csr`, en `*.pem` bij lezen) blijft bewust toegankelijk.
+**Voor wie:** iedereen die een agent-CLI met filesystem-toegang op een werkmachine draait. De canonieke regelset staat in `common/templates/claude-deny-secrets.json`; publiek materiaal (`*.crt`, `*.csr`, en `*.pem` bij lezen) blijft bewust toegankelijk, en `kubectl --kubeconfig ~/.kube/config get pods` blijft werken.
 
 **Snelle start:**
 ```bash
 bash common/check-claude-guardrails.sh                          # audit huidige user
+bash common/claude-pre-tool-use.sh --self-test                  # 21 fixtures door de hook
 bash common/check-claude-guardrails.sh --settings /pad/naar.json  # andere settings-file
 ```
 
-User-level, read-only, installeert niets — exit-code 0/1/2 net als `check.sh`. Voor de afwegingen (waarom `.pem` wél lezen, wat deze laag níét afdekt) zie [`docs/explanation/claude-code-guardrails.md`](docs/explanation/claude-code-guardrails.md).
+User-level, read-only, installeert niets — exit-code 0/1/2 net als `check.sh`. De hook wordt met de hand in `settings.json` geregistreerd (snippet staat in de doc); een installer die JSON in je settings merget is meer risico dan die regel waard is. Voor de afwegingen (waarom `.pem` wél lezen, wat deze laag níét afdekt) zie [`docs/explanation/claude-code-guardrails.md`](docs/explanation/claude-code-guardrails.md).
 
 ## Installatie
 

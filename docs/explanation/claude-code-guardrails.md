@@ -10,10 +10,12 @@ filesystem with your own permissions. For an audit, the relevant question is
 not "what did I ask the agent to do" but **"what *can* the agent do, and where
 is that enforced"**.
 
-This layer answers that with a deny-list in `~/.claude/settings.json`, a
-canonical rule set in this repository
-(`common/templates/claude-deny-secrets.json`), and a checker that verifies the
-two still agree (`common/check-claude-guardrails.sh`).
+This layer answers that with three parts: a deny-list in
+`~/.claude/settings.json` for the file tools, a `PreToolUse` hook
+(`common/claude-pre-tool-use.sh`) for the shell, and a checker
+(`common/check-claude-guardrails.sh`) that verifies both are actually in place
+and still match the canonical rule set in this repository
+(`common/templates/claude-deny-secrets.json`).
 
 ## The trap that made this necessary
 
@@ -60,12 +62,57 @@ covers only the main directory. The double notation is redundant; a deny that
 fires twice costs nothing, while a deny that silently fails to match is the bug
 described above.
 
+## The shell layer
+
+A deny-list governs the Read/Edit tools. It says nothing about what a *command*
+does: `cat ~/.env` is a Bash call and slips straight past it. That gap is closed
+by `common/claude-pre-tool-use.sh`, a `PreToolUse` hook that receives every tool
+call as JSON on stdin before it runs and answers with an exit code — 2 blocks,
+0 allows.
+
+The hook grades in two tiers, deliberately unequal:
+
+- **Tier 1 — secret files** (`.env`, `*.key`, `*_rsa`, `*.p12`, `*.pfx`): any
+  Bash call mentioning one is blocked. Such paths have no legitimate reason to
+  appear in an agent's command.
+- **Tier 2 — credential directories** (`~/.ssh`, `~/.aws`, `~/.gnupg`,
+  `~/.kube`): blocked only in combination with a reading or copying verb
+  (`cat`, `base64`, `cp`, `scp`, `curl`, …). Without that distinction
+  `kubectl --kubeconfig ~/.kube/config get pods` would die, and that is exactly
+  the legitimate case: the process reads its own config, and the contents never
+  enter the model's context.
+
+The hook also refuses to let the agent edit its own guard files — the hook
+directory and any `.claude/*allowlist`. A fence the agent can move is not a
+fence.
+
+Wire it up in `~/.claude/settings.json`:
+
+    "hooks": {
+      "PreToolUse": [
+        { "matcher": "", "hooks": [
+          { "type": "command", "command": "/path/to/common/claude-pre-tool-use.sh" }
+        ]}
+      ]
+    }
+
+`bash common/claude-pre-tool-use.sh --self-test` runs 21 fixtures through the
+same decision function a live call takes — both directions, because a hook that
+blocks everything is as broken as one that blocks nothing.
+`check-claude-guardrails.sh` reports whether the hook is registered at all and
+whether the registered copy still matches the one in this repository.
+
 ## What this layer does *not* cover
 
-- **Shell commands.** The rules apply to the Read/Edit tools, not to what a
-  process does by itself. `cat ~/.env` inside a Bash tool call is governed by
-  Bash rules, not file rules. Closing that gap needs a `PreToolUse` hook that
-  inspects commands — such a hook is not (yet) part of this repository.
+- **A determined agent.** The hook sees the command string, so it catches the
+  obvious forms. Variable indirection, a path assembled at runtime, or a helper
+  script that reads the file will pass. This is a guardrail against accident and
+  drift, not a sandbox: the agent runs with your permissions, and only the OS can
+  change that.
+- **Destructive commands.** `git push --force`, `kubectl delete`,
+  `terraform destroy` — deliberately out of scope here. That is workstation
+  policy, not a security baseline; put it in a second hook next to this one if
+  you want it.
 - **What the agent legitimately executes.** `kubectl get` keeps working with a
   blocked `~/.kube/`: kubectl reads its own config as a process. That is
   intended — the block only stops the credential file itself from ending up in
@@ -83,6 +130,7 @@ is worse than both being wrong — then the reader believes the wrong half.
     bash common/check-claude-guardrails.sh                          # audit the current user
     bash common/check-claude-guardrails.sh --settings /path/x.json  # a different settings file
     bash common/check-claude-guardrails.sh --rules /path/r.json     # your own rule set
+    bash common/claude-pre-tool-use.sh --self-test                  # verify the hook's decisions
 
 Exit code 0 means fine, 1 means one problem, 2 means two or more (capped, so
 cron/CI can work with it). A missing `jq` or an unreadable settings file also

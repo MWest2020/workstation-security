@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### 2026-08-04 — Shell-laag onder laag 4: PreToolUse-hook
+
+#### Toegevoegd
+
+- `common/claude-pre-tool-use.sh` (`role: entrypoint`) — PreToolUse-hook die het gat dicht dat in de doc van gisteren expliciet als open stond: de denylist in `settings.json` geldt voor de Read/Edit-tools, maar `cat ~/.env` is een Bash-call en glipt eronderdoor. De hook krijgt elke tool-call als JSON op stdin en beslist met een exit-code (2 = blokkeren). Twee tiers: secret-bestanden (`.env`, `*.key`, `*_rsa`, `*.p12`, `*.pfx`) blokkeren bij élke vermelding; credential-directories (`~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.kube`) alleen in combinatie met een lees-/kopieer-verb, zodat `kubectl --kubeconfig ~/.kube/config get pods` blijft werken. Beschermt daarnaast zijn eigen guard-files tegen bewerking door de agent. Ontbreekt `jq`, dan blokkeert de hook — dezelfde lijn als de checker: "kon niet verifiëren" gaat nooit door voor "toegestaan".
+- `--self-test` op diezelfde hook — 21 fixtures door exact de beslisfunctie die een live call ook neemt, in beide richtingen (11 moeten blokkeren, 10 moeten doorgaan). Een hook die alles tegenhoudt is net zo stuk als een die niets tegenhoudt. Opgenomen in `smoke.yml`, faalt hard.
+
+#### Gewijzigd
+
+- `common/check-claude-guardrails.sh` — derde soort bevinding: is er überhaupt een PreToolUse-hook geregistreerd, is dat déze hook, en is de geregistreerde kopie nog identiek aan de repo-versie (`cmp`)? Niet geregistreerd is een fout, een afwijkende kopie een waarschuwing — dat laatste kan een bewuste uitbreiding zijn.
+- `docs/explanation/claude-code-guardrails.md` — nieuwe sectie "The shell layer" met de twee tiers en het settings-snippet. De bullet "shell commands are not covered" is vervangen door wat nu wél overblijft: variabele-indirectie en runtime-samengestelde paden glippen er nog steeds langs. Dit is een guardrail tegen ongelukken en drift, geen sandbox — de agent draait met jouw rechten, en alleen het OS verandert daar iets aan.
+- Destructieve commando's (`git push --force`, `kubectl delete`, `terraform destroy`) blijven bewust buiten deze hook: dat is werkplek-beleid, geen security-baseline. De doc zegt dat expliciet, met de suggestie zoiets in een tweede hook ernaast te zetten.
+
 ### 2026-08-03 — Laag 4: agent-guardrails voor Claude Code
 
 #### Toegevoegd

@@ -15,6 +15,17 @@
 - `docs/explanation/claude-code-guardrails.md` — nieuwe sectie "The shell layer" met de twee tiers en het settings-snippet. De bullet "shell commands are not covered" is vervangen door wat nu wél overblijft: variabele-indirectie en runtime-samengestelde paden glippen er nog steeds langs. Dit is een guardrail tegen ongelukken en drift, geen sandbox — de agent draait met jouw rechten, en alleen het OS verandert daar iets aan.
 - Destructieve commando's (`git push --force`, `kubectl delete`, `terraform destroy`) blijven bewust buiten deze hook: dat is werkplek-beleid, geen security-baseline. De doc zegt dat expliciet, met de suggestie zoiets in een tweede hook ernaast te zetten.
 
+#### Geactiveerd op de referentie-werkplek
+
+De hook staat niet vanzelf aan: registratie is handwerk in `~/.claude/settings.json`, een bestand dat buiten deze repo en buiten versiebeheer valt. Op de werkplek van de maintainer is hij op 2026-08-04 als tweede entry in de bestaande `hooks.PreToolUse[].hooks[]`-array gezet, naast de al aanwezige persoonlijke hook. Beide draaien; de eerste die exit 2 geeft blokkeert. De wijziging werd zonder herstart actief.
+
+Live geverifieerd in beide richtingen, niet alleen via `--self-test`:
+
+- **Blokkeert:** een `cat`-call op een `.env`-pad werd geweigerd door `common/claude-pre-tool-use.sh` (de melding noemt het script, dus aantoonbaar niet door de persoonlijke hook opgevangen). Bewust getest op een *niet-bestaand* pad — een probe die de inhoud van een echte `.env` zou tonen als de hook níét vuurt, is geen test maar een incident.
+- **Laat door:** `kubectl --kubeconfig ~/.kube/config config current-context` liep normaal door. Dat is het tier-2-onderscheid in de praktijk: het pad noemen mag, de inhoud eruit lezen niet.
+
+`check-claude-guardrails.sh` rapporteert sindsdien "PreToolUse-hook actief en identiek aan repo-versie" en exit 0.
+
 ### 2026-08-03 — Laag 4: agent-guardrails voor Claude Code
 
 #### Toegevoegd

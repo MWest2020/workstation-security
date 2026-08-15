@@ -54,6 +54,28 @@ bash common/install-pm-cooldown.sh --dry-run   # wat het zou doen, geen wijzigin
 
 User-level (`~/.npmrc`, `~/.bunfig.toml`, `~/.config/uv/uv.toml`, `~/.config/pip/pip.conf`). Voor CI / per-project / override-flow zie [`docs/supply-chain-cooldown.md`](docs/supply-chain-cooldown.md).
 
+### 2b. Testisolatie — voorkom dat een suite je eigen staat vervuilt
+
+**Wat:** draait een testsuite met `$HOME` in een wegwerpmap en faalt als de
+suite daarin schreef. Wat je daar aantreft, was anders in je echte `$HOME`
+beland.
+
+**Voor wie:** iedereen die een testsuite onderhoudt die paden uit `$HOME`
+afleidt (state, config, cache). Het faalgeval is stil: de tests blijven groen
+terwijl je staat vervuilt, dus je merkt het pas als een commando dat die staat
+leest raar gaat doen.
+
+**Snelle start:**
+```bash
+bash common/check-test-isolation.sh uv run pytest -q
+bash common/check-test-isolation.sh python -m pytest tests/
+TEST_ISOLATION_ALLOW='.myapp/*' bash common/check-test-isolation.sh npm test
+```
+
+Hoort in de quality gate van de repo (`scripts/verify.sh`, `pre-commit` of
+CI), niet in iemands geheugen. De achterliggende regel staat in
+`~/.claude/CLAUDE.md` § *Tests: isolation is not optional*.
+
 ### 3. Incident response — GitHub-token compromise
 
 **Wat:** losse IR-tool voor het CanisterSprawl-scenario (gestolen GitHub-PAT met dead-man's switch die `rm -rf ~/` triggert wanneer je 'm probeert te revoken). Detecteert, ontwapent veilig (SIGKILL-first, evidence buiten `$HOME`), en wacht op handmatige revoke met verify.

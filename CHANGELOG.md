@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+### 2026-08-15 — Testisolatie afdwingen
+
+#### Toegevoegd
+
+`common/check-test-isolation.sh` — draait een testsuite met `$HOME` in een
+wegwerpmap en faalt als de suite daarin heeft geschreven. Elk bestand dat je
+er aantreft was anders in de echte `$HOME` van de gebruiker beland.
+
+Aanleiding: de testsuite van `certswap` schreef 28 tmp-deployments in de
+echte `~/.certswap/state.json`. `apply` schrijft naar `default_state_path()`
+en kende geen `--state`-vlag, dus er was geen manier om de run buiten de
+gebruikersstaat te houden. Gevolg: `certswap upcoming` werd onleesbaar —
+kapotgemaakt door zijn eigen tests, terwijl elke testrun groen was. Dat
+laatste is de kern: dit type fout meldt zichzelf nooit.
+
+Ontwerpkeuze: eerst geprobeerd om `$HOME` te bewaken op nieuwe bestanden na
+afloop. Dat vangt op een werkstation ook Slack, Jenkins-containers en
+sessielogs — ruis in plaats van signaal. Met een verlegde `$HOME` is de
+meting exact, én de schrijfactie is meteen onschadelijk. Cachevariabelen
+(`XDG_CACHE_HOME`, `UV_CACHE_DIR`, `PIP_CACHE_DIR`, `npm_config_cache`)
+blijven naar de echte cache wijzen, zodat een run niet trager wordt.
+
+De bijbehorende regel staat in `~/.claude/CLAUDE.md` § *Tests: isolation is
+not optional*: paden die van `$HOME` zijn afgeleid horen env-tunable te zijn,
+en de override hoort in een autouse-fixture — niet in losse tests.
+
 ### 2026-08-04 — Shell-laag onder laag 4: PreToolUse-hook
 
 #### Toegevoegd

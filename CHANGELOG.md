@@ -2,6 +2,51 @@
 
 ## Unreleased
 
+### 2026-08-24 — Laag 4 (agent-guardrails) verhuisd naar ConductionNL/claude-plugins
+
+VERSION 1.0.0 → 1.1.0. Een laag verdwijnt uit deze repo, dus dat is geen
+patch-bump.
+
+**Verplaatst** naar `ConductionNL/claude-plugins`, plugin
+`engineering-baseline`:
+
+| Was hier | Is daar |
+|---|---|
+| `common/claude-pre-tool-use.sh` | `plugins/engineering-baseline/hooks/secret-guardrail.sh` |
+| `common/check-claude-guardrails.sh` | `plugins/engineering-baseline/scripts/check-guardrails.sh` |
+| `common/templates/claude-deny-secrets.json` | `settings/deny-baseline.json` |
+| `docs/explanation/claude-code-guardrails.md` | `docs/guardrail-lagen.md` |
+
+**Waarom.** Deze repo staat onder een persoonlijk account, en laag 4 werd de
+facto organisatieconfiguratie: de deny-set en de hook stonden op de werkplekken
+van een team. Blijft dat zo, dan hangt die werkplek aan één persoon, en dat
+blijkt pas als die persoon weg is. Aanleiding was een concrete overdracht.
+
+Er is een tweede reden, die technisch zwaarder weegt. Laag 4 was de énige laag
+zonder installatiepad — de README zei het zelf: "de hook wordt met de hand in
+`settings.json` geregistreerd; een installer die JSON in je settings merget is
+meer risico dan die regel waard is." Dat bezwaar staat nog steeds, maar een
+Claude Code-plugin lost het van de andere kant op: die registreert zijn eigen
+hooks via `hooks.json`, zonder ooit in iemands `settings.json` te schrijven. Het
+mechanisme dat we niet wilden bouwen bestond al.
+
+**Wat blijft.** Alles wat de machine inricht: de distro-installers, de
+package-manager-cooldown, de shell-tooling, de header- en isolatiechecks. De
+grens is nu expliciet — wat Claude Code configureert staat daar, wat de machine
+inricht staat hier.
+
+**Gevolgen.** De `guardrails`-job in `smoke.yml` is verwijderd en het
+hook-zelftestblok is uit de distro-matrix gehaald; die 21 + 7 fixtures draaien
+nu in de CI van de plugin-repo. `docs/explanation/` heeft geen
+`claude-code-guardrails.md` meer; `docs/index.md` en de doc-tabel in de README
+verwijzen naar de nieuwe plek.
+
+**Voor wie de hook al geregistreerd had:** hij blijft werken zolang het oude
+pad bestaat, maar dat bestand is nu weg. Registreer hem opnieuw vanuit de
+plugin. De audit daar accepteert bewust ook de oude naam en meldt het als
+migratiestap in plaats van als fout — een audit die afgaat op een werkende
+opstelling wordt genegeerd.
+
 ### 2026-08-15 — Testisolatie afdwingen
 
 #### Toegevoegd

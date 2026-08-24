@@ -32,6 +32,6 @@ real review promotes a page to `status: current`.
   required vs optional components, failure modes, and partial-install recovery.
 - [explanation/supply-chain-cooldown.md](explanation/supply-chain-cooldown.md)
   — the 7-day package-version quarantine for npm / pnpm / bun / uv / pip.
-- [explanation/claude-code-guardrails.md](explanation/claude-code-guardrails.md)
+- Laag 4 (agent-guardrails) is verhuisd naar `ConductionNL/claude-plugins`, zie `docs/guardrail-lagen.md` daar
   — the secret deny-list for agent CLIs with filesystem access, and what that
   layer does not cover.

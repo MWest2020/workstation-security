@@ -61,27 +61,5 @@ jobs:
               echo
               echo "=== install-pm-cooldown.sh --dry-run ==="
               bash common/install-pm-cooldown.sh --dry-run
-              echo
-              echo "=== claude-pre-tool-use.sh --self-test ==="
-              # Zuivere logica-test op de hook-beslissingen: geen settings, geen
-              # netwerk, geen side effects. Faalt hard — een guardrail die de
-              # verkeerde kant op beslist is een defect, geen warning.
-              bash common/claude-pre-tool-use.sh --self-test
             '
 
-  # check-claude-guardrails.sh --self-test draait hier en niet in de matrix
-  # hierboven: die self-test heeft jq nodig en de kale distro-images hebben dat
-  # niet. Per distro jq installeren zou package-manager-ruis toevoegen aan een
-  # test die juist distro-onafhankelijk is — pure logica op gefabriceerde
-  # fixtures. De runner heeft jq standaard.
-  guardrails:
-    runs-on: ubuntu-latest
-    name: guardrails self-tests
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Self-tests van de agent-guardrails
-        run: |
-          bash common/claude-pre-tool-use.sh --self-test
-          bash common/check-claude-guardrails.sh --self-test
